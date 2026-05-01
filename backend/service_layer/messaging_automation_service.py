@@ -1002,6 +1002,15 @@ class MessagingAutomationService:
                 if queued_request:
                     reply = f"{reply} {queued_request.get('message')}".strip()
 
+        await self._remember_recent_booking_reference(
+            session,
+            channel=normalized_channel,
+            conversation_id=conversation_key,
+            tenant_id=tenant_ref,
+            customer_identity=identity_metadata,
+            booking_reference=booking_reference,
+            existing_state=channel_state,
+        )
         reply_controls = self._booking_care_reply_controls(booking_reference)
         # Bot voice-out: if the user originally sent a voice message and the
         # feature flag is on, synthesize the reply via Piper and stash audio
@@ -4608,6 +4617,45 @@ class MessagingAutomationService:
         from integrations.ai_models.whisper_adapter import WhisperAdapter
 
         return WhisperAdapter.from_env()
+
+    async def _remember_recent_booking_reference(
+        self,
+        session,
+        *,
+        channel: str,
+        conversation_id: str | None,
+        tenant_id: str | None,
+        customer_identity: dict[str, object],
+        booking_reference: str,
+        existing_state: dict[str, object] | None = None,
+    ) -> None:
+        if not conversation_id or not booking_reference:
+            return
+        existing_metadata = (existing_state or {}).get("session_metadata") if existing_state else {}
+        if not isinstance(existing_metadata, dict):
+            existing_metadata = {}
+        merged_metadata = {
+            **existing_metadata,
+            "recent_booking_reference": booking_reference,
+            "recent_booking_recorded_at": datetime.now(UTC).isoformat(),
+        }
+        await self._upsert_channel_session_state(
+            session,
+            channel=channel,
+            conversation_id=conversation_id,
+            tenant_id=tenant_id,
+            customer_identity=customer_identity,
+            service_search_query=(existing_state or {}).get("service_search_query"),
+            service_options=[
+                item
+                for item in ((existing_state or {}).get("service_options") or [])
+                if isinstance(item, dict)
+            ],
+            reply_controls=(existing_state or {}).get("reply_controls") or {},
+            last_ai_intent="recent_booking_recorded",
+            last_workflow_status="answered",
+            metadata=merged_metadata,
+        )
 
     SUPPORTED_LOCALES = ("en", "vi")
     DEFAULT_LOCALE = "en"
