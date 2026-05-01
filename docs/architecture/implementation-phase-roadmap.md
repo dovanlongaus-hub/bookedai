@@ -123,6 +123,26 @@ It should start with the chess academy as the first complete connected-agent pro
 
 Only after the chess flow works end-to-end should the connected-agent pattern be generalized into wider multi-tenant templates.
 
+## AIMentor sub-project — second connected-agent proof (`2026-05-01`)
+
+`aimentor.bookedai.au` is the second tenant-branded subdomain to land an end-to-end connected-agent flow on top of the shared platform. Where chess proves intake → assessment → subscription → coach-report, AIMentor proves a complementary surface set:
+
+- LLM-powered free-form chat NLU with provider fallback (OpenAI 5.4 primary → Claude via taphoaapi)
+- voice loop closed end-to-end on Telegram (Whisper STT inbound → Piper TTS outbound, feature-flagged via `ENABLE_BOT_VOICE_OUT`)
+- in-channel direct booking via Telegram inline keyboards (no web detour required)
+- self-serve cancel + reschedule from web account UI, Telegram, or WhatsApp with full Zoho Meeting + CRM Deal stage sync
+- daily retention cadence (T+1d / T+7d / T+30d / T+90d) with channel priority `last_engaged_channel` → `telegram` > `whatsapp` > `email`
+- account portal Progress timeline (Booked → Confirmed → In progress → Completed → Feedback → Next session) backed by `orchestrate_status_update`
+
+The detailed product + technical requirements live at `docs/architecture/aimentor-product-requirements-2026-05-01.md`. Implementation status, test coverage manifest (~85 backend tests + 9 Playwright tests), and deferred-item inventory are tracked there as the canonical source of truth.
+
+The pattern AIMentor establishes — and that future sub-projects should follow — is: shared `CommunicationService` + `lifecycle_ops_service` + `MessagingAutomationService` + `LLMRouter` + `ZohoCrmAdapter` + `BookingIntentRepository` underneath, with the sub-project's own dedicated frontend bundle + tenant slug + per-sub-project requirements doc on top. Never fork shared services per sub-project; instead extend them with new orchestrator functions or new event types in the existing service layer.
+
+Outstanding AIMentor work that is intentionally deferred (next-session candidates):
+
+- `ConversationEngine` channel-agnostic refactor (~5 engineer-days). Will collapse the per-channel rule-based dispatch in `messaging_automation_service.py` into a single `Intent`-emitting engine that web, Telegram, and WhatsApp adapters render against.
+- WhatsApp full interactive list / template parity. Currently WhatsApp falls back to a deep-link to the web for the programs catalog because the Cloud API caps interactive buttons at 3. Unblocks once Meta approves the AIMentor template messages for the retention cadence and the programs picker.
+
 ## Priority reset locked from `2026-04-19`
 
 All remaining roadmap sequencing should now be interpreted through these priority bands:

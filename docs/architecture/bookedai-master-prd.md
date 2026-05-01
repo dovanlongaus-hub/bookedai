@@ -892,3 +892,48 @@ Any future change to positioning, pricing, revenue metrics, or channel scope mus
 - `docs/architecture/implementation-phase-roadmap.md`
 - `docs/architecture/mvp-sprint-execution-plan.md`
 - the relevant strategy document for pricing, analytics, tenant, admin, or public growth
+
+## 25. Sub-project requirements
+
+BookedAI ships a small number of standalone tenant-branded experiences that share the backend platform but have their own frontend bundle, brand, and product surface. Each sub-project has a dedicated requirements document. Any change to a sub-project's product surface must update its dedicated doc; changes to shared backend (booking, payments, lifecycle, messaging, CRM sync) update the platform docs above and the affected sub-project doc together.
+
+### 25.1 chess.bookedai.au
+
+Standalone customer-facing landing experience for Mai Hung Chess Academy (`mai-hung-chess`). Independent Vite bundle (`frontend/chess.html` → `<ChessGrandmasterApp>`); separate deploy artifact (`frontend/dist-chess/`); decoupled marketing cadence. Booking, payment, account, and CRM all flow through the shared backend.
+
+- Source of truth: `docs/architecture/chess-subproject.md`
+- Hostname routing: `chess.bookedai.au` (Nginx + Cloudflare DNS)
+- Bundle entry: `frontend/src/chess-entry.tsx`
+- Tenant slug: `mai-hung-chess`
+
+### 25.2 aimentor.bookedai.au
+
+Tenant-branded AI Mentor 1-1 Pro runtime for `ai-mentor-doer`. Booking lifecycle (cancel/reschedule/status), retention cadence (T+1d / T+7d / T+30d / T+90d), LLM-powered web chat NLU (OpenAI 5.4 primary, Claude/taphoaapi fallback), voice loop (Whisper STT in + Piper TTS out, gated by `ENABLE_BOT_VOICE_OUT`), Telegram inline-keyboard book direct, account portal Progress tab, and 14 lifecycle email templates EN+VI. WhatsApp uses the shared `+61455301335` business number via `CommunicationService.send_whatsapp` — no per-subdomain Meta WABA.
+
+- Source of truth: `docs/architecture/aimentor-product-requirements-2026-05-01.md`
+- Hostname routing: `aimentor.bookedai.au` (Nginx + Cloudflare DNS, live since `2026-04-28`)
+- Bundle entry: `frontend/src/apps/public/AIMentorBookedAIApp.tsx` (mounted via `AppRouter.tsx`)
+- Tenant slug: `ai-mentor-doer`
+- Implementation status: Phases 1-4 + foundation shipped via PRs #26, #27, #30, #31 between `2026-04-30` and `2026-05-01`. ConversationEngine channel-agnostic refactor and full WhatsApp interactive parity remain deferred (see PRD section 7 "Implementation status" for the live status table).
+
+### 25.3 product.bookedai.au
+
+Multi-tenant marketplace surface listing public services across all BookedAI tenants. Independent Vite bundle, separate deploy artifact, shared booking/payment/lifecycle backend.
+
+- Source of truth: existing product-app strategy (see `docs/architecture/public-growth-app-strategy.md` for the marketplace-surface posture; product-specific runbooks live alongside the chess and aimentor docs).
+
+### 25.4 future-swim.bookedai.au
+
+Tenant-branded Future Swim Centre runtime (parent portal, coach ops, demo bookings). Independent Vite bundle, magic-email-code login, parent portal student progress and evaluation, coach ops dashboard.
+
+- Source of truth: existing future-swim docs and migration trails in `docs/development/`. Detailed product requirements doc to be added when the feature stack stabilizes (Phase 3.2C onward).
+
+### 25.5 Sub-project change governance
+
+When the platform team adds a new sub-project:
+
+1. Add a new `docs/architecture/<name>-subproject.md` (or equivalent) with goals, personas, functional requirements, technical decisions, API surface, lifecycle orchestration, implementation status, test coverage, open risks, and cross-references — mirroring the AIMentor PRD shape (`aimentor-product-requirements-2026-05-01.md`).
+2. Add a section here under `25.x <name>.bookedai.au` with a one-paragraph summary, hostname routing, bundle entry, tenant slug, and a link to the dedicated doc.
+3. Update `docs/architecture/implementation-phase-roadmap.md` with any sub-project-specific priority rules (see the "Chess-first priority rule" + AIMentor sibling for the pattern).
+4. Update `docs/architecture/bookedai-master-roadmap-2026-04-26.md` "Latest Sprint Closeout Note" with a dated entry summarizing the sub-project's launch + scope.
+5. Reuse shared platform building blocks (`CommunicationService`, `lifecycle_ops_service`, `MessagingAutomationService`, `LLMRouter`, `ZohoCrmAdapter`, `BookingIntentRepository`, `service_merchant_profiles`) — never fork them per sub-project.
