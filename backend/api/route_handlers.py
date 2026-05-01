@@ -3522,6 +3522,40 @@ async def telegram_webhook(request: Request) -> dict[str, object]:
                     if not reply_markup:
                         reply_markup = None
 
+                # Bot voice-out: when MessagingAutomationService synthesized a
+                # Piper reply (only fires when ENABLE_BOT_VOICE_OUT=true AND the
+                # user sent voice), upload the audio via Telegram sendVoice
+                # BEFORE the text reply. Voice is a bonus channel — any failure
+                # here MUST fall through to the text reply below.
+                voice_audio = (
+                    care_metadata.get("reply_controls", {}).get("telegram_voice_audio")
+                    if isinstance(care_metadata.get("reply_controls"), dict)
+                    else None
+                )
+                if isinstance(voice_audio, dict) and voice_audio.get("audio_bytes"):
+                    try:
+                        from integrations.telegram.voice_send import send_telegram_voice
+
+                        settings_obj = request.app.state.settings
+                        bot_token = (
+                            str(getattr(settings_obj, "bookedai_customer_telegram_bot_token", "") or "").strip()
+                            or str(getattr(settings_obj, "telegram_bot_token", "") or "").strip()
+                        )
+                        chat_id = str(metadata.get("telegram_chat_id") or "").strip()
+                        if bot_token and chat_id:
+                            await send_telegram_voice(
+                                token=bot_token,
+                                chat_id=chat_id,
+                                audio_bytes=voice_audio["audio_bytes"],
+                                audio_format=str(voice_audio.get("audio_format") or "audio/ogg"),
+                            )
+                    except Exception as exc:  # noqa: BLE001
+                        logger.warning(
+                            "telegram_send_voice_failed",
+                            extra={"error": str(exc)},
+                        )
+                        # Fall through to text reply — voice is bonus, not critical.
+
                 delivery_metadata = await _send_messaging_customer_care_reply(
                     request,
                     channel="telegram",

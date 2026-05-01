@@ -74,6 +74,17 @@ MESSAGING_PER_CHAT_WINDOW_SECONDS = _env_int(
     "BOOKEDAI_MESSAGING_PER_CHAT_WINDOW_SECONDS", 3600
 )
 
+# Bot voice-out: when enabled, if the user originally sent a voice message
+# on Telegram we synthesize the assistant reply via Piper TTS and attach
+# the audio to the outbound payload so the route handler can send it via
+# Telegram sendVoice. Default OFF — flip to "true" to activate once a Piper
+# service is reachable from the bot host.
+ENABLE_BOT_VOICE_OUT = os.getenv("ENABLE_BOT_VOICE_OUT", "false").lower() in (
+    "true",
+    "1",
+    "yes",
+)
+
 _messaging_per_chat_limiter = InMemoryRateLimiter()
 
 
@@ -991,6 +1002,21 @@ class MessagingAutomationService:
                 if queued_request:
                     reply = f"{reply} {queued_request.get('message')}".strip()
 
+        reply_controls = self._booking_care_reply_controls(booking_reference)
+        # Bot voice-out: if the user originally sent a voice message and the
+        # feature flag is on, synthesize the reply via Piper and stash audio
+        # bytes in reply_controls so the route handler can sendVoice. We do
+        # this at the LAST possible point (after queued_request append) so
+        # the audio mirrors the final assistant text the user will see.
+        user_spoke = bool(metadata.get("voice")) if isinstance(metadata, dict) else False
+        voice_audio = await self._maybe_synthesize_voice_reply(
+            reply_text=reply,
+            channel=normalized_channel,
+            user_spoke=user_spoke,
+        )
+        if voice_audio:
+            reply_controls.setdefault("telegram_voice_audio", voice_audio)
+
         return MessagingAutomationResult(
             ai_reply=reply,
             ai_intent="answered",
@@ -1003,9 +1029,63 @@ class MessagingAutomationService:
                 "booking_resolution": resolution,
                 "care_turn": care_turn,
                 "queued_request": queued_request,
-                "reply_controls": self._booking_care_reply_controls(booking_reference),
+                "reply_controls": reply_controls,
             },
         )
+
+    async def _maybe_synthesize_voice_reply(
+        self,
+        *,
+        reply_text: str,
+        channel: str,
+        user_spoke: bool,
+    ) -> dict | None:
+        """If voice-out is enabled AND the user originally sent voice AND
+        channel is Telegram, synthesize the reply text via Piper and return
+        audio metadata. Returns None to skip voice-out (fall through to
+        text-only reply).
+
+        Errors are caught and logged — voice is a bonus, never critical, so
+        any Piper failure must NOT break the text reply path.
+        """
+        if not ENABLE_BOT_VOICE_OUT:
+            return None
+        if channel != "telegram":
+            return None
+        if not user_spoke:
+            return None  # user typed — don't surprise them with audio
+        if not reply_text or not reply_text.strip():
+            return None
+        if len(reply_text) > 800:
+            return None  # too long for a voice reply; let text reply handle it
+        try:
+            from integrations.piper.piper_adapter import (
+                PiperAdapter,
+                PiperAdapterError,
+            )
+
+            adapter = PiperAdapter.from_env()
+            result = await adapter.synthesize(reply_text)
+            return {
+                "audio_bytes": result.audio_bytes,
+                "audio_format": result.audio_format,
+                "voice": result.voice,
+                "latency_ms": result.latency_ms,
+                # Piper-medium ~ 1 char per 60ms; rough estimate omitted for v1.
+                "duration_seconds": None,
+            }
+        except PiperAdapterError as exc:
+            _logger.warning(
+                "bot_voice_out_failed",
+                extra={"channel": channel, "error": str(exc), "len": len(reply_text)},
+            )
+            return None
+        except Exception as exc:  # noqa: BLE001
+            _logger.warning(
+                "bot_voice_out_failed",
+                extra={"channel": channel, "error": str(exc), "len": len(reply_text)},
+            )
+            return None
 
     async def send_reply(
         self,
