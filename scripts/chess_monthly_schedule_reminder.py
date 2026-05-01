@@ -40,7 +40,11 @@ import sys
 from datetime import datetime, timezone
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(ROOT, "backend"))
+# Support both host layout (<ROOT>/backend/<module>) and container layout
+# (<ROOT>/<module>, since the backend/ contents are copied to /app at build).
+for _candidate in (os.path.join(ROOT, "backend"), ROOT):
+    if _candidate not in sys.path:
+        sys.path.insert(0, _candidate)
 
 from config import get_settings  # type: ignore
 from db import create_engine, create_session_factory, get_session  # type: ignore
