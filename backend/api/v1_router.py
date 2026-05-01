@@ -12,6 +12,7 @@ from api.v1_chess_payment_routes import router as chess_payment_router
 from api.v1_chess_slot_routes import router as chess_slot_router
 from api.v1_chess_student_routes import router as chess_student_router
 from api.v1_communication_routes import router as communication_router
+from api.v1_futureswim_coach_routes import router as futureswim_coach_router
 from api.v1_futureswim_portal_routes import router as futureswim_portal_router
 from api.v1_handoff_routes import router as handoff_router
 from api.v1_integration_routes import router as integration_router
@@ -44,6 +45,7 @@ router.include_router(chess_payment_router)
 router.include_router(chess_slot_router)
 router.include_router(chess_student_router)
 router.include_router(communication_router)
+router.include_router(futureswim_coach_router)
 router.include_router(futureswim_portal_router)
 router.include_router(handoff_router)
 router.include_router(integration_router)
