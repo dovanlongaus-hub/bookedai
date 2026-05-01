@@ -30,7 +30,19 @@ if str(BACKEND_DIR) not in sys.path:
 # we install a stub with the four error classes so the tuple is non-empty.
 # ---------------------------------------------------------------------------
 
-if "openai" not in sys.modules:
+_REQUIRED_OPENAI_NAMES = (
+    "RateLimitError",
+    "InternalServerError",
+    "APIConnectionError",
+    "APITimeoutError",
+    "AsyncOpenAI",
+)
+_existing_openai = sys.modules.get("openai")
+_need_stub = _existing_openai is None or not all(
+    hasattr(_existing_openai, name) for name in _REQUIRED_OPENAI_NAMES
+)
+
+if _need_stub:
     stub = types.ModuleType("openai")
 
     class _StubBase(Exception):

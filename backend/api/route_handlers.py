@@ -788,6 +788,23 @@ def _extract_telegram_payload(payload: dict[str, object]) -> tuple[TawkMessage, 
             user_location = {"latitude": float(latitude), "longitude": float(longitude)}
             if not text_value:
                 text_value = "Find more on Internet near me"
+    # Voice notes carry no inline text — Whisper STT runs in the messaging
+    # service and replaces ``message.text`` before slash-command parsing.
+    voice_payload = raw_message.get("voice")
+    voice_metadata: dict[str, object] | None = None
+    if isinstance(voice_payload, dict):
+        voice_file_id = str(voice_payload.get("file_id") or "").strip() or None
+        if voice_file_id:
+            voice_metadata = {
+                "file_id": voice_file_id,
+                "duration": voice_payload.get("duration"),
+                "mime_type": str(voice_payload.get("mime_type") or "audio/ogg"),
+                "file_size": voice_payload.get("file_size"),
+            }
+            if not text_value or text_value == "[Telegram message]":
+                # Placeholder so downstream pre-checks (rate limiter, etc.)
+                # have a non-empty ``text``. The Whisper handler overwrites it.
+                text_value = "[Telegram voice message]"
     if not text_value:
         text_value = "[Telegram message]"
     first_name = str(sender.get("first_name") or "").strip()
@@ -847,6 +864,7 @@ def _extract_telegram_payload(payload: dict[str, object]) -> tuple[TawkMessage, 
         "start_command_payload": start_command_payload,
         "handoff_session_id": handoff_session_id,
         "user_location": user_location,
+        "voice": voice_metadata,
         "raw_payload": raw_message,
     }
     return message, metadata

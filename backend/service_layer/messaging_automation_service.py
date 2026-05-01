@@ -160,6 +160,18 @@ class MessagingAutomationService:
         metadata: dict[str, object],
     ) -> MessagingAutomationResult:
         normalized_channel = self._normalize_channel(channel)
+
+        # Voice STT — runs BEFORE the rate limiter / slash dispatch so the
+        # downstream pipeline sees a normal text message. Telegram-only for
+        # v1; WhatsApp voice (different audio format + auth flow) is deferred.
+        voice_failure = await self._maybe_transcribe_voice(
+            channel=normalized_channel,
+            message=message,
+            metadata=metadata,
+        )
+        if voice_failure is not None:
+            return voice_failure
+
         conversation_key = self._conversation_key(message=message, metadata=metadata)
 
         # Per-chat-id inbound rate limit (Lane 6 §5 P2 guardrail). Silently
@@ -4402,6 +4414,121 @@ class MessagingAutomationService:
             support_email=support_email,
         )
 
+    # ------------------------------------------------------------------
+    # Voice STT (Telegram only for v1; WhatsApp deferred — different audio
+    # format + auth flow). Lifted out of ``handle_customer_message`` to keep
+    # the dispatcher readable. Tests patch ``_download_voice_audio`` and
+    # ``_build_whisper_adapter`` to avoid touching the network. See also
+    # ``LOCALIZED_COPY['voice_failed']`` for the friendly fallback string.
+    # ------------------------------------------------------------------
+
+    async def _maybe_transcribe_voice(
+        self,
+        *,
+        channel: str,
+        message: TawkMessage,
+        metadata: dict[str, object],
+    ) -> "MessagingAutomationResult | None":
+        """If the inbound message is a Telegram voice note, run Whisper STT.
+
+        Returns ``None`` when there is no voice payload or transcription
+        succeeds (in which case ``message.text`` has been replaced in place).
+        Returns a populated :class:`MessagingAutomationResult` when STT
+        fails — caller should short-circuit and reply with that result.
+        """
+
+        if channel != "telegram":
+            return None
+        voice_meta = metadata.get("voice")
+        if not isinstance(voice_meta, dict):
+            return None
+        file_id = str(voice_meta.get("file_id") or "").strip()
+        if not file_id:
+            return None
+
+        locale = self._resolve_locale(metadata.get("telegram_language_code"))
+        bot_token = (
+            os.getenv("BOOKEDAI_CUSTOMER_TELEGRAM_BOT_TOKEN")
+            or os.getenv("TELEGRAM_BOT_TOKEN")
+            or ""
+        ).strip()
+
+        try:
+            audio_bytes = await self._download_voice_audio(
+                token=bot_token,
+                file_id=file_id,
+            )
+            adapter = self._build_whisper_adapter()
+            transcription = await adapter.transcribe(
+                audio_bytes,
+                filename="voice.ogg",
+                language_hint=locale,
+            )
+        except Exception as exc:  # noqa: BLE001 — any failure → friendly fallback
+            _logger.warning(
+                "messaging_voice_transcription_failed channel=%s error_type=%s",
+                channel,
+                type(exc).__name__,
+                extra={
+                    "event_type": "messaging_voice_transcription_failed",
+                    "channel": channel,
+                    "error_type": type(exc).__name__,
+                },
+            )
+            failure_reply = self._localized("voice_failed", locale)
+            return MessagingAutomationResult(
+                ai_reply=failure_reply,
+                ai_intent="voice_transcription_failed",
+                workflow_status="answered",
+                metadata={
+                    "channel": channel,
+                    "customer_care_status": "voice_transcription_failed",
+                    "voice_transcription": {
+                        "status": "failed",
+                        "error_type": type(exc).__name__,
+                    },
+                    "locale": locale,
+                },
+            )
+
+        # Replace the placeholder text with the transcription so downstream
+        # slash-command parsing, NLU, and lifecycle ops behave identically to
+        # a typed message. Privacy: never log the transcription content.
+        message.text = transcription.text
+        existing_message_meta = (
+            message.metadata if isinstance(message.metadata, dict) else {}
+        )
+        existing_message_meta["voice_transcribed"] = True
+        message.metadata = existing_message_meta
+        metadata["voice_transcription"] = {
+            "status": "ok",
+            "detected_language": transcription.detected_language,
+            "duration_seconds": transcription.duration_seconds,
+            "latency_ms": transcription.latency_ms,
+            "text_length": len(transcription.text),
+        }
+        return None
+
+    @staticmethod
+    async def _download_voice_audio(*, token: str, file_id: str) -> bytes:
+        """Wrapper so tests can patch the network call without touching
+        :mod:`integrations.telegram.voice_download` directly.
+        """
+
+        from integrations.telegram.voice_download import download_telegram_voice
+
+        return await download_telegram_voice(token, file_id)
+
+    @staticmethod
+    def _build_whisper_adapter():
+        """Factory hook for the Whisper adapter; tests patch this to inject
+        a mock without monkeypatching the whole module.
+        """
+
+        from integrations.ai_models.whisper_adapter import WhisperAdapter
+
+        return WhisperAdapter.from_env()
+
     SUPPORTED_LOCALES = ("en", "vi")
     DEFAULT_LOCALE = "en"
 
@@ -4657,6 +4784,14 @@ class MessagingAutomationService:
         "book_cancelled": {
             "en": "Booking cancelled.",
             "vi": "Đã huỷ đặt chỗ.",
+        },
+        "voice_heard": {
+            "en": "Heard: \"{text}\"",
+            "vi": "Nghe được: \"{text}\"",
+        },
+        "voice_failed": {
+            "en": "I couldn't hear that. Could you type your message?",
+            "vi": "Mình không nghe rõ. Bạn gõ lại giúp nhé?",
         },
     }
 
