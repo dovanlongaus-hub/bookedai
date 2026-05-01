@@ -12,6 +12,20 @@ It is also the mandatory write-back target whenever a change has been completed 
 
 Date: `2026-04-28`
 
+Implementation update from `2026-05-01` (key feature roadmap expansion, documentation-only):
+
+- created `project_vn.md` as the Vietnamese consolidated project requirements document covering BookedAI core, shared platform requirements, AI Ask/chat, booking/payment/portal, messaging/CRM/calendar, tenant/admin workspaces, non-functional requirements, KPIs, roadmap, and the Chess Academy, Future Swim, and AI Mentor 1-1 Pro subprojects
+- added a shared Ask requirement for latest-intent capture and final-choice confirmation: if a customer changes any material choice in chat, including package, service, class/program, time, location, delivery mode, participant/student count, instructor/mentor, payment option, attachment-driven decision, reschedule/cancel, or handoff preference, Ask must infer the latest active intent, summarize the final choice, and ask for explicit confirmation before booking, payment, email confirmation, reschedule/cancel mutation, document submission, or handoff
+- added `docs/pm/11-KEY-FEATURE-ROADMAP.md` as the active feature-level rollout plan for shared BookedAI core plus the Chess Academy, Future Swim, and AI Mentor 1-1 Pro subprojects
+- converted enterprise benchmark research into sprint-level feature gates: shared Ask voice/file attachments, identity-aware shared channel routing, portal hub, availability/waitlist states, tenant Ask config, lifecycle email with tenant CC/resources, cases/handoff, knowledge/document-aware Ask, billing/subscription hub, analytics/revenue proof, staff mobile posture, and partner/marketplace readiness
+- made Future Swim the strictest operations lane with iClassPro-style family/student portal, waivers/medical notes, attendance, skill evaluations, absence/makeup, private lesson/evaluation, check-in, and swim BI requirements
+- added separate Chess and AI Mentor lanes for Chess.com-style lesson/game/classroom features and AI-learning-style document intake, Socratic Ask, session workspace, action plans, learning paths, group sessions, and mentor dashboard features
+- synchronized the roadmap into the PM index, master PRD, execution plan, synced roadmap, sprint register, project memory, and daily memory; verification is documentation-only with `git diff --check`
+- published the roadmap closeout to Notion; archive entry: `docs/development/telegram-sync/2026-05-01/015743-key-feature-roadmap-expansion.md`
+- published the Ask intent-revision requirement to Notion; archive entry: `docs/development/telegram-sync/2026-05-01/020546-ask-intent-revision-and-final-choice-confirmation.md`
+- published the generalized latest-intent refinement to Notion; archive entry: `docs/development/telegram-sync/2026-05-01/021429-ask-latest-intent-for-all-chat-choices.md`
+- published the Vietnamese consolidated requirements document to Notion; archive entry: `docs/development/telegram-sync/2026-05-01/021909-project-vn-consolidated-requirements.md`
+
 Implementation update from `2026-04-29` (tenant enterprise workspace shell, local):
 
 - redesigned the tenant workspace shell in `frontend/src/apps/tenant/TenantApp.tsx` into a more enterprise operator console: sticky top bar, icon action controls, 2xl desktop icon rail, sticky left workspace menu, right-side content frame, contextual panel actions, and mobile bottom icon navigation
@@ -3371,3 +3385,16 @@ The `bookedai.au` public assistant now keeps lead capture on the public tenant-s
 - update: capped SMS confirmation copy at two message segments and included booking reference, service, requested slot, portal link, and BookedAI support reply guidance.
 - update: fixed AI Mentor service/payment lookups that were comparing varchar `service_merchant_profiles.tenant_id` values against uuid tenant ids, preventing invalid-cast failures in live booking/payment context resolution.
 - verification: `python3 -m py_compile backend/api/v1_ai_mentor_student_handlers.py backend/api/v1_booking_handlers.py`; `git diff --check`; frontend build for the tenant workspace breakpoint follow-up; deploy-live; stack health; production homepage smoke confirmed the winning-SME copy and sanitized Booking Activity drawer.
+
+## 2026-05-01 AIMentor Phase 1-4 Inline Cleanup + TTS Fix
+
+- update: rewrote AIMentorChat TTS watcher in `frontend/src/apps/public/aimentor/AIMentorChat.tsx` (lines ~890-906). Old logic only spoke when `messages[messages.length-1]` was `kind:'text'`, but every chat code path appends a `programs` / `slots` / `contact_form` / `typing` payload after each text reply, so the trailing element is rarely text and TTS never fired in practice. New logic scans messages backwards for the most-recent assistant text message and dedupes via `lastSpokenIdRef` so toggling voice off then on does not re-speak the same message. Added `lastSpokenIdRef` ref alongside `pendingSpeak`.
+- decision (flag audit, premature soak): the original 14-day cleanup plan called for ramping `cancel_eligibility !== false` and `reschedule_eligibility !== false` defaults from defensive to strict, dropping the `queue_portal_booking_request` legacy fallback in `messaging_automation_service`, and ramping `voiceMode` default-on for mobile. All three are EXPLICITLY KEPT for now — Phases 1-4 only landed today (2026-05-01), zero production soak time, no signal yet that orchestrators are stable enough to drop the fallback or that voice-mode default-on improves conversion. Re-evaluate once 14 days of production telemetry is in. Tracking note: this conversation disabled the auto-fired remote routine (`trig_01D5akuEHdVBC6pVx17fNx2H`) because the user wanted the TTS fix done immediately rather than wait for the cron.
+- inventory: AIMentor Phase 3 follow-up items still outstanding as of 2026-05-01. Priority recommendation per item:
+  - HIGH — POST /api/v1/aimentor/chat/turn endpoint backed by `LLMRouter` (commit 15e9671): unlocks LLM-powered free-form replies for the web chat. Needed before bot parity makes sense.
+  - HIGH — `ConversationEngine` channel-agnostic refactor in `backend/service_layer/conversation/`: prerequisite for sharing one engine between web, Telegram, WhatsApp. Riskiest piece; ~5 engineer-days.
+  - MEDIUM — Whisper STT for Telegram/WhatsApp voice notes (download → `openai.whisper-1` or local `whisper.cpp` → engine). Telegram-first, WhatsApp follows.
+  - MEDIUM — Piper TTS Docker service (`rhasspy/piper:latest` + `en_US-ryan-medium` voice) so bot replies can be audio. Self-hosted, no per-character billing. Adds a docker-compose service.
+  - MEDIUM — AIMentorAccountApp Progress tab UI. Backend `orchestrate_status_update` (commit 95659ae) already feeds the timeline; only frontend work remaining.
+  - LOW — WhatsApp interactive list / template approval for full programs flow parity. Currently Telegram is full inline-keyboard, WhatsApp falls back to a web deep link. Needs Meta template approval cycle (~1 week) before code can ship.
+- verification: `cd frontend && npx tsc --noEmit` shows no new AIMentorChat errors (pre-existing unrelated errors in StudentPortalSections + FutureSwimParentPortalApp untouched). Existing `frontend/tests/aimentor-voice-mode.spec.ts` still asserts correct behaviour because the new logic is a strict superset of the old (it speaks text messages whether or not a non-text payload trails them).
