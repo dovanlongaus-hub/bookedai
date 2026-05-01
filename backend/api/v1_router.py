@@ -26,7 +26,6 @@ from api.v1_search_routes import router as search_router
 from api.v1_tenant_ai_mentor_progress_routes import (
     router as tenant_ai_mentor_progress_router,
 )
-from api.v1_tenant_broadcast_routes import router as tenant_broadcast_router
 from api.v1_tenant_chess_progress_routes import router as tenant_chess_progress_router
 from api.v1_tenant_routes import router as tenant_router
 from api.v1_tenant_zoho_integration_routes import (
@@ -59,7 +58,6 @@ router.include_router(public_tenant_config_router)
 router.include_router(admin_tenant_config_router)
 router.include_router(sandbox_router)
 router.include_router(tenant_ai_mentor_progress_router)
-router.include_router(tenant_broadcast_router)
 router.include_router(tenant_chess_progress_router)
 router.include_router(tenant_router)
 router.include_router(tenant_zoho_integration_router)

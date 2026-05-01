@@ -36,6 +36,9 @@ type StudentBookingSummary = {
   payment_status: string;
   cancel_eligibility?: boolean;
   reschedule_eligibility?: boolean;
+  // Phase 4: backend may emit a per-booking status transition list. Optional
+  // until `orchestrate_status_update` is wired through `/students/me`.
+  status_history?: Array<{ status: string; at: string; notes?: string | null }>;
 };
 
 type StudentProgressEntry = {
@@ -123,6 +126,14 @@ const dict = {
     account: {
       welcome: (name: string) => `Welcome back, ${name}.`,
       signedInAs: 'Signed in as',
+      tabBookings: 'Bookings',
+      tabProgress: 'Progress',
+      progressTabHeading: 'Your booking journey',
+      progressTabLead:
+        'Each milestone of your AI Mentor sessions, from booking to feedback.',
+      progressEmptyHero:
+        'No bookings yet — your progress will show up here once you book your first session.',
+      progressEmptyCta: 'Browse programs',
       bookingsHeading: 'Your bookings',
       bookingsLead: 'Upcoming and recent AI Mentor sessions held in your name.',
       bookingsEmpty:
@@ -221,6 +232,14 @@ const dict = {
     account: {
       welcome: (name: string) => `Xin chào, ${name}.`,
       signedInAs: 'Đăng nhập với',
+      tabBookings: 'Lịch học',
+      tabProgress: 'Tiến độ',
+      progressTabHeading: 'Hành trình buổi học của bạn',
+      progressTabLead:
+        'Các mốc tiến độ của mỗi buổi AI Mentor, từ lúc đặt cho tới khi phản hồi.',
+      progressEmptyHero:
+        'Chưa có booking — tiến độ sẽ hiển thị sau khi bạn đặt buổi đầu tiên.',
+      progressEmptyCta: 'Xem các khoá',
       bookingsHeading: 'Lịch học của bạn',
       bookingsLead: 'Các buổi AI Mentor sắp tới và gần đây dưới tên bạn.',
       bookingsEmpty:
@@ -752,6 +771,203 @@ function ProgressTimeline({
   );
 }
 
+// ---------------- Booking status journey (Progress tab) ----------------
+
+type StepState = 'done' | 'current' | 'pending' | 'skipped';
+type StepKey = 'booked' | 'confirmed' | 'in_progress' | 'completed' | 'feedback' | 'next';
+
+type TimelineStep = {
+  key: StepKey;
+  label: string;
+  state: StepState;
+  detail?: string;
+};
+
+const STEP_COPY = {
+  en: {
+    booked: 'Booked',
+    confirmed: 'Confirmed',
+    in_progress: 'In progress',
+    completed: 'Completed',
+    feedback: 'Feedback',
+    next: 'Book your next session',
+    cancelled_notice: 'Booking cancelled',
+    refunded_notice: 'Refunded',
+    pending_notice: 'Awaiting confirmation',
+  },
+  vi: {
+    booked: 'Đã đặt',
+    confirmed: 'Đã xác nhận',
+    in_progress: 'Đang học',
+    completed: 'Hoàn thành',
+    feedback: 'Phản hồi',
+    next: 'Đặt buổi tiếp theo',
+    cancelled_notice: 'Đã huỷ booking',
+    refunded_notice: 'Đã hoàn tiền',
+    pending_notice: 'Đang chờ xác nhận',
+  },
+} as const;
+
+function computeSteps(
+  booking: StudentBookingSummary,
+  locale: Locale,
+): TimelineStep[] {
+  const labels = STEP_COPY[locale];
+  const status = (booking.status || '').toLowerCase();
+  const history = Array.isArray(booking.status_history) ? booking.status_history : [];
+  const visited = new Set<string>(history.map((entry) => (entry.status || '').toLowerCase()));
+  if (status) visited.add(status);
+
+  const isCancelled = status === 'cancelled';
+  const isRefunded = status === 'refunded';
+  const isCompleted = status === 'completed';
+  const isInProgress = status === 'in_progress';
+  const isPaidOrConfirmed = status === 'paid' || status === 'confirmed';
+  const isPending = status === 'pending';
+
+  if (isCancelled || isRefunded) {
+    const notice = isRefunded ? labels.refunded_notice : labels.cancelled_notice;
+    return [
+      { key: 'booked', label: labels.booked, state: 'done' },
+      { key: 'confirmed', label: labels.confirmed, state: 'skipped', detail: notice },
+      { key: 'in_progress', label: labels.in_progress, state: 'skipped' },
+      { key: 'completed', label: labels.completed, state: 'skipped' },
+      { key: 'feedback', label: labels.feedback, state: 'skipped' },
+      { key: 'next', label: labels.next, state: 'skipped' },
+    ];
+  }
+
+  // Each milestone is "done" once the booking has progressed past it. The
+  // single live milestone ("current") is whichever one matches today's status.
+  const reachedConfirmed =
+    isPaidOrConfirmed || isInProgress || isCompleted || visited.has('paid') || visited.has('confirmed');
+  let confirmedState: StepState;
+  if (isPaidOrConfirmed) confirmedState = 'current';
+  else if (reachedConfirmed) confirmedState = 'done';
+  else confirmedState = isPending ? 'current' : 'pending';
+
+  const reachedInProgress = isInProgress || isCompleted || visited.has('in_progress');
+  let inProgressState: StepState;
+  if (isInProgress) inProgressState = 'current';
+  else if (reachedInProgress) inProgressState = 'done';
+  else inProgressState = 'pending';
+
+  // Once status is 'completed' the milestone itself is satisfied (done) and
+  // the live cursor moves forward to Feedback.
+  const reachedCompleted = isCompleted || visited.has('completed');
+  const completedState: StepState = reachedCompleted ? 'done' : 'pending';
+
+  // Feedback surfaces once the session is completed; pending prior to that.
+  // Backend extension will populate this from `orchestrate_status_update`.
+  const feedbackState: StepState = reachedCompleted ? 'current' : 'pending';
+
+  const nextState: StepState = 'pending';
+
+  let confirmedDetail: string | undefined;
+  if (isPending) confirmedDetail = labels.pending_notice;
+
+  return [
+    { key: 'booked', label: labels.booked, state: 'done' },
+    { key: 'confirmed', label: labels.confirmed, state: confirmedState, detail: confirmedDetail },
+    { key: 'in_progress', label: labels.in_progress, state: inProgressState },
+    { key: 'completed', label: labels.completed, state: completedState },
+    { key: 'feedback', label: labels.feedback, state: feedbackState },
+    { key: 'next', label: labels.next, state: nextState },
+  ];
+}
+
+function dotBackground(state: StepState): string {
+  if (state === 'done') return 'var(--aim-teal-bright)';
+  if (state === 'current') return 'var(--aim-coral)';
+  if (state === 'skipped') return 'var(--aim-line)';
+  return 'var(--aim-cream-deep)';
+}
+
+function BookingStatusTimeline({
+  booking,
+  locale,
+}: {
+  booking: StudentBookingSummary;
+  locale: Locale;
+}) {
+  const steps = computeSteps(booking, locale);
+  const headingDate = `${booking.requested_date || '—'} ${booking.requested_time || ''}`.trim();
+  return (
+    <div className="aim-card-flat" style={{ padding: 20 }}>
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 12,
+          alignItems: 'baseline',
+          marginBottom: 14,
+        }}
+      >
+        <span
+          style={{
+            fontSize: '1rem',
+            color: 'var(--aim-ink)',
+            fontWeight: 700,
+            fontFamily: 'var(--aim-font-display)',
+            letterSpacing: '-0.01em',
+          }}
+        >
+          {booking.service_name || '—'}
+        </span>
+        <span style={{ fontSize: '0.85rem', color: 'var(--aim-muted)', fontFamily: 'var(--aim-font-mono)' }}>
+          {headingDate} · {booking.booking_reference}
+        </span>
+      </div>
+      <ol
+        className="aim-progress-timeline"
+        style={{ listStyle: 'none', padding: 0, margin: 0 }}
+      >
+        {steps.map((step) => (
+          <li
+            key={step.key}
+            style={{
+              display: 'flex',
+              gap: 12,
+              padding: '8px 0',
+              alignItems: 'flex-start',
+            }}
+          >
+            <span
+              aria-hidden="true"
+              style={{
+                width: 12,
+                height: 12,
+                borderRadius: '50%',
+                marginTop: 6,
+                background: dotBackground(step.state),
+                flexShrink: 0,
+                border: step.state === 'pending' ? '1px solid var(--aim-line)' : 'none',
+              }}
+            />
+            <div style={{ flex: 1 }}>
+              <div
+                data-step-state={step.state}
+                style={{
+                  fontWeight: step.state === 'current' ? 600 : 400,
+                  color: step.state === 'skipped' ? 'var(--aim-muted)' : 'var(--aim-text)',
+                  fontSize: '0.95rem',
+                }}
+              >
+                {step.label}
+              </div>
+              {step.detail ? (
+                <div style={{ fontSize: 13, color: 'var(--aim-muted)', marginTop: 2 }}>
+                  {step.detail}
+                </div>
+              ) : null}
+            </div>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
 // ---------------- Main app -----------------------------------------------
 
 export function AIMentorAccountApp() {
@@ -798,6 +1014,10 @@ export function AIMentorAccountApp() {
   const [rescheduleError, setRescheduleError] = useState<string | null>(null);
 
   const [actionToast, setActionToast] = useState<string | null>(null);
+
+  // Active tab on the signed-in dashboard. Bookings stays the default —
+  // Progress is a read-only journey view introduced for Phase 4.
+  const [activeTab, setActiveTab] = useState<'bookings' | 'progress'>('bookings');
 
   const googleClientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '').trim();
   const [googleReady, setGoogleReady] = useState(false);
@@ -1432,52 +1652,139 @@ export function AIMentorAccountApp() {
                 </div>
               ) : null}
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <div>
-                  <h2
-                    className="aim-section-title"
-                    style={{ fontSize: 'clamp(1.3rem, 2.5vw, 1.7rem)' }}
-                  >
-                    {t.account.bookingsHeading}
-                  </h2>
-                  <p
-                    style={{
-                      color: 'var(--aim-muted)',
-                      fontSize: '0.92rem',
-                      marginTop: 4,
-                    }}
-                  >
-                    {t.account.bookingsLead}
-                  </p>
-                </div>
-                <BookingsTable
-                  bookings={account?.bookings ?? []}
-                  t={t}
-                  onCancel={openCancelModal}
-                  onReschedule={openRescheduleModal}
-                />
+              <div
+                role="tablist"
+                aria-label={t.account.bookingsHeading}
+                className="aim-tab-strip"
+                style={{
+                  display: 'flex',
+                  gap: 8,
+                  borderBottom: '1px solid var(--aim-line)',
+                  marginBottom: 4,
+                }}
+              >
+                {(['bookings', 'progress'] as const).map((tab) => {
+                  const active = activeTab === tab;
+                  const label = tab === 'bookings' ? t.account.tabBookings : t.account.tabProgress;
+                  return (
+                    <button
+                      key={tab}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      data-active={active}
+                      className="aim-btn aim-btn-ghost aim-btn-sm"
+                      onClick={() => setActiveTab(tab)}
+                      style={{
+                        borderRadius: 0,
+                        borderBottom: active
+                          ? '2px solid var(--aim-coral)'
+                          : '2px solid transparent',
+                        color: active ? 'var(--aim-ink)' : 'var(--aim-muted)',
+                        fontWeight: active ? 700 : 500,
+                        padding: '10px 14px',
+                      }}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <div>
-                  <h2
-                    className="aim-section-title"
-                    style={{ fontSize: 'clamp(1.3rem, 2.5vw, 1.7rem)' }}
-                  >
-                    {t.account.progressHeading}
-                  </h2>
-                  <p
-                    style={{
-                      color: 'var(--aim-muted)',
-                      fontSize: '0.92rem',
-                      marginTop: 4,
-                    }}
-                  >
-                    {t.account.progressLead}
-                  </p>
+              {activeTab === 'bookings' ? (
+                <>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    <div>
+                      <h2
+                        className="aim-section-title"
+                        style={{ fontSize: 'clamp(1.3rem, 2.5vw, 1.7rem)' }}
+                      >
+                        {t.account.bookingsHeading}
+                      </h2>
+                      <p
+                        style={{
+                          color: 'var(--aim-muted)',
+                          fontSize: '0.92rem',
+                          marginTop: 4,
+                        }}
+                      >
+                        {t.account.bookingsLead}
+                      </p>
+                    </div>
+                    <BookingsTable
+                      bookings={account?.bookings ?? []}
+                      t={t}
+                      onCancel={openCancelModal}
+                      onReschedule={openRescheduleModal}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    <div>
+                      <h2
+                        className="aim-section-title"
+                        style={{ fontSize: 'clamp(1.3rem, 2.5vw, 1.7rem)' }}
+                      >
+                        {t.account.progressHeading}
+                      </h2>
+                      <p
+                        style={{
+                          color: 'var(--aim-muted)',
+                          fontSize: '0.92rem',
+                          marginTop: 4,
+                        }}
+                      >
+                        {t.account.progressLead}
+                      </p>
+                    </div>
+                    <ProgressTimeline progress={account?.progress ?? []} t={t} />
+                  </div>
+                </>
+              ) : (
+                <div
+                  role="tabpanel"
+                  aria-label={t.account.progressTabHeading}
+                  style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
+                >
+                  <div>
+                    <h2
+                      className="aim-section-title"
+                      style={{ fontSize: 'clamp(1.3rem, 2.5vw, 1.7rem)' }}
+                    >
+                      {t.account.progressTabHeading}
+                    </h2>
+                    <p
+                      style={{
+                        color: 'var(--aim-muted)',
+                        fontSize: '0.92rem',
+                        marginTop: 4,
+                      }}
+                    >
+                      {t.account.progressTabLead}
+                    </p>
+                  </div>
+                  {(account?.bookings ?? []).length === 0 ? (
+                    <div className="aim-card" style={{ padding: 24, textAlign: 'center' }}>
+                      <p style={{ margin: '0 0 12px', color: 'var(--aim-muted)' }}>
+                        {t.account.progressEmptyHero}
+                      </p>
+                      <a className="aim-btn aim-btn-primary" href="/aimentor#programs">
+                        {t.account.progressEmptyCta}
+                      </a>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                      {(account?.bookings ?? []).map((booking) => (
+                        <BookingStatusTimeline
+                          key={booking.booking_intent_id}
+                          booking={booking}
+                          locale={locale}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <ProgressTimeline progress={account?.progress ?? []} t={t} />
-              </div>
+              )}
             </div>
           </section>
         )}
