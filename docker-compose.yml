@@ -104,8 +104,24 @@ services:
     depends_on:
       - backend
 
+  # Piper TTS — self-hosted neural text-to-speech for bot voice-out.
+  # Env (consumed by backend's PiperAdapter, not by this container):
+  #   PIPER_TTS_URL=http://piper-tts:5000
+  #   PIPER_VOICE=en_US-ryan-medium
+  #   PIPER_REQUEST_TIMEOUT_SECONDS=15
+  piper-tts:
+    image: rhasspy/wyoming-piper:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5000:5000"
+    environment:
+      - PIPER_VOICE=${PIPER_VOICE:-en_US-ryan-medium}
+    volumes:
+      - piper_models:/data
+
 volumes:
   postgres_data:
+  piper_models:
 
 networks:
   default:
