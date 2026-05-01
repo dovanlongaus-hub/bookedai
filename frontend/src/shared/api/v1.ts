@@ -1989,6 +1989,7 @@ export interface StudentProgressEntry {
   level: string;
   attendance: string;
   notes: string;
+  next_focus?: string | null;
 }
 
 export interface StudentMeResponse {

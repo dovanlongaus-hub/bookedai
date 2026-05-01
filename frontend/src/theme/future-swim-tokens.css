@@ -345,6 +345,25 @@
   border-color: rgba(249, 115, 22, 0.30);
 }
 
+.fs-chip-warn {
+  background: rgba(185, 28, 28, 0.08);
+  color: var(--fs-danger);
+  border-color: rgba(185, 28, 28, 0.30);
+}
+
+.fs-student-avatar {
+  display: inline-flex;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--fs-primary) 0%, var(--fs-primary-dark) 100%);
+  color: #fff;
+  flex-shrink: 0;
+  box-shadow: var(--fs-shadow-primary);
+}
+
 /* Typography */
 .fs-kicker {
   font-size: 0.7rem;
