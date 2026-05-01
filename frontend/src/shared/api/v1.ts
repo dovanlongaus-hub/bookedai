@@ -1415,6 +1415,95 @@ export async function tenantUpdateStudentProgress(
   );
 }
 
+// --- Phase 4 §2: tenant broadcast endpoints -------------------------------
+
+export type TenantBroadcastAudienceType = 'all' | 'region' | 'student';
+export type TenantBroadcastChannel = 'email' | 'whatsapp' | 'telegram';
+export type TenantBroadcastLocale = 'en' | 'vi';
+
+export interface TenantBroadcastAudienceInput {
+  type: TenantBroadcastAudienceType;
+  region?: string | null;
+  student_contact_id?: string | null;
+}
+
+export interface TenantBroadcastSendRequest {
+  audience: TenantBroadcastAudienceInput;
+  channels: TenantBroadcastChannel[];
+  subject?: string | null;
+  body: string;
+  locale: TenantBroadcastLocale;
+}
+
+export interface TenantBroadcastChannelSummary {
+  sent: number;
+  skipped: number;
+  failed: number;
+}
+
+export interface TenantBroadcastSendResponse {
+  broadcast_id: string;
+  audience_count: number;
+  dispatch_summary: Partial<Record<TenantBroadcastChannel, TenantBroadcastChannelSummary>>;
+}
+
+export interface TenantBroadcastAudienceSampleContact {
+  name: string;
+  region: string;
+  email_present: boolean;
+  phone_present: boolean;
+  whatsapp_present: boolean;
+  telegram_present: boolean;
+}
+
+export interface TenantBroadcastAudiencePreviewResponse {
+  audience_count: number;
+  sample_contacts: TenantBroadcastAudienceSampleContact[];
+  available_regions: string[];
+}
+
+export async function tenantBroadcastAudiencePreview(
+  args: {
+    audienceType: TenantBroadcastAudienceType;
+    region?: string | null;
+    studentContactId?: string | null;
+    tenantRef?: string | null;
+  },
+  sessionToken?: string | null,
+) {
+  const params = new URLSearchParams();
+  params.set('audience_type', args.audienceType);
+  if (args.region) params.set('region', args.region);
+  if (args.studentContactId) params.set('student_contact_id', args.studentContactId);
+  if (args.tenantRef) params.set('tenant_ref', args.tenantRef);
+  const headers = new Headers();
+  if (sessionToken) {
+    headers.set('Authorization', `Bearer ${sessionToken}`);
+  }
+  return requestV1Envelope<TenantBroadcastAudiencePreviewResponse>(
+    `/v1/tenants/me/broadcast/audience-preview?${params.toString()}`,
+    { headers },
+  );
+}
+
+export async function tenantBroadcastSend(
+  request: TenantBroadcastSendRequest,
+  options?: { tenantRef?: string | null },
+  sessionToken?: string | null,
+) {
+  const params = new URLSearchParams();
+  if (options?.tenantRef) params.set('tenant_ref', options.tenantRef);
+  const query = params.size ? `?${params.toString()}` : '';
+  const headers = new Headers();
+  if (sessionToken) {
+    headers.set('Authorization', `Bearer ${sessionToken}`);
+  }
+  return requestV1Envelope<TenantBroadcastSendResponse>(
+    `/v1/tenants/me/broadcast${query}`,
+    withJsonBody(request, { method: 'POST', headers }),
+  );
+}
+
 export type TenantZohoService = 'calendar' | 'crm';
 
 export interface TenantZohoCalendarConnectionState {
@@ -1989,6 +2078,7 @@ export interface StudentProgressEntry {
   level: string;
   attendance: string;
   notes: string;
+  next_focus?: string | null;
 }
 
 export interface StudentMeResponse {
@@ -2844,6 +2934,8 @@ export const apiV1 = {
   getTenantLeads,
   tenantListStudents,
   tenantUpdateStudentProgress,
+  tenantBroadcastAudiencePreview,
+  tenantBroadcastSend,
   tenantGetIntegrations,
   tenantGetZohoAuthorizeUrl,
   tenantTestZoho,
