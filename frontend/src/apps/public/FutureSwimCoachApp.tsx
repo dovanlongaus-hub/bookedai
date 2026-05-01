@@ -874,6 +874,22 @@ export function FutureSwimCoachApp() {
             <>
               <CoachHeader coach={summary.coach} onLogout={handleLogout} />
               <StudentsTable students={summary.students} sessionToken={sessionToken} />
+              <footer className="mt-10 fs-card-flat">
+                <div className="fs-kicker">Tenant ops</div>
+                <p className="mt-2 text-sm leading-6 text-[color:var(--fs-text-muted)]">
+                  Sending a centre-wide announcement, weekly schedule reminder, or
+                  a one-off message to a single parent is handled in the BookedAI
+                  tenant workspace. Open the tenant admin to compose and send.
+                </p>
+                <a
+                  href="https://tenant.bookedai.au/?tenant=future-swim"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="fs-button-secondary mt-3 inline-flex"
+                >
+                  Open tenant admin → Broadcasts
+                </a>
+              </footer>
               <div className="mt-8 flex flex-wrap items-center justify-between gap-3 text-xs text-[color:var(--fs-text-soft)]">
                 <span>
                   Future Swim coach dashboard · Powered by BookedAI ·{' '}
