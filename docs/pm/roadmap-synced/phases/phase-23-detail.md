@@ -5,7 +5,7 @@ Start: `2026-04-26` (P0-7 + P0-8 closed `2026-04-26` overlay) | End: `2026-06-07
 
 ## Theme
 
-One release-gate suite covering pitch registration, product booking, demo academy flow, portal continuation, tenant workspace, admin ledger, API health; stronger trace ids; documented rollback and hold criteria; Notion + Discord closeout automation; GitHub Actions CI; expanded `.env.production.example` checksum guard; OpenClaw rootless + Docker-socket scope reduction; beta DB separation + image registry with `git-sha` tags; observability stack (Prometheus + Grafana + AlertManager + error tracker).
+One release-gate suite covering pitch registration, product booking, demo academy flow, portal continuation, tenant workspace, admin ledger, API health; stronger trace ids; documented rollback and hold criteria; Notion/archive closeout automation with Discord only when explicitly requested; GitHub Actions CI; expanded `.env.production.example` checksum guard; OpenClaw rootless + Docker-socket scope reduction; beta DB separation + image registry with `git-sha` tags; observability stack (Prometheus + Grafana + AlertManager + error tracker).
 
 ## Strategic intent
 

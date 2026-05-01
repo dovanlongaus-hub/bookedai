@@ -19,7 +19,7 @@ UAT pass requires evidence, not just implementation completion. Evidence can be:
 - Playwright trace/screenshot/report path
 - API probe output captured in a development note
 - live browser observation with exact URL and timestamp
-- operator sign-off in Notion/Discord closeout
+- operator sign-off in Notion/archive closeout; Discord only when explicitly requested
 
 All dates below are anchored from `2026-04-26`.
 

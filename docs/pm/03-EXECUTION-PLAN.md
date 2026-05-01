@@ -17,6 +17,8 @@
 >
 > **For Vision/Target/Milestones**, read [`roadmap-synced/04-VISION-TARGET-MILESTONES.md`](./roadmap-synced/04-VISION-TARGET-MILESTONES.md).
 >
+> **For the final `2026-05-01` PRD-to-master-plan-to-detailed-execution consolidation before new coding**, read [`../development/final-consolidated-execution-plan-2026-05-01.md`](../development/final-consolidated-execution-plan-2026-05-01.md).
+>
 > The dates listed in the body sections below are RETAINED for historical traceability but are SUPERSEDED by the synced pack.
 
 Date: `2026-04-26` (today). Status: `active execution baseline`.
@@ -42,7 +44,7 @@ Mỗi phase phải đóng đủ 10 cổng (theo [phase-execution-operating-syste
 6. Live smoke passed sau deploy
 7. `implementation-progress.md` updated
 8. Roadmap/sprint document updated
-9. Notion + Discord closeout published khi operator-visible
+9. Notion/archive closeout published khi operator-visible; Discord only when the operator explicitly requests it for that task
 10. Next phase opened với owners/blockers/acceptance gates
 
 ## 2. Phase Index Snapshot
@@ -427,7 +429,7 @@ Khi 1 phase đóng:
 5. Update test cases status trong [`05-TEST-PLAN.md`](05-TEST-PLAN.md).
 6. Update UAT items trong [`06-UAT-CHECKLIST.md`](06-UAT-CHECKLIST.md).
 7. Close related questions trong [`09-OPEN-QUESTIONS.md`](09-OPEN-QUESTIONS.md).
-8. Notion + Discord closeout published khi operator-visible.
+8. Notion/archive closeout published khi operator-visible; Discord only when explicitly requested.
 
 ## Changelog
 

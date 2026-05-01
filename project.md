@@ -85,7 +85,7 @@ Latest AI Mentor tenant login update from `2026-04-28`:
 
 Current canonical roadmap reference: `docs/architecture/bookedai-master-roadmap-2026-04-26.md` is the single end-to-end roadmap from Phase 0 through Phase 23 plus the post-Sprint-22 horizon. It integrates the seven-lane review captured in `docs/development/full-stack-review-2026-04-26.md` (architecture+UAT, frontend UI/UX, corporate/business, backend, API+integrations, DevOps, conversational chat) and is the authoritative source when this document conflicts with detailed phase or sprint artifacts on roadmap-level questions.
 
-Current PM execution control: `docs/development/phase-execution-operating-system-2026-04-26.md` defines the agent-lane operating model, phase closeout gates, UAT standard, deploy-live standard, and active Sprint 19 execution board. Phase `0-16` remain historical baselines; active execution starts from Phase/Sprint `17-23` and every phase must close UAT, deployment, documentation, Notion/Discord, and next-phase handoff before moving forward.
+Current PM execution control: `docs/development/phase-execution-operating-system-2026-04-26.md` defines the agent-lane operating model, phase closeout gates, UAT standard, deploy-live standard, and active Sprint 19 execution board. Phase `0-16` remain historical baselines; active execution starts from Phase/Sprint `17-23` and every phase must close UAT, deployment, documentation, Notion/archive as needed, and next-phase handoff before moving forward. Discord is skipped unless explicitly requested for a task.
 
 ## Content, Wording, And Layout Baseline
 
@@ -260,12 +260,12 @@ BookedAI should be read as one connected AI Revenue Engine, not as separate demo
 - Customer acquisition surfaces: `bookedai.au`, `product.bookedai.au`, `pitch.bookedai.au`, `/architecture`, `/roadmap`, embedded widget surfaces, and future tenant-owned installs.
 - Customer action surfaces: website chat, product assistant, Telegram customer bot, WhatsApp, SMS/email later, and `portal.bookedai.au` for returning-customer status and change requests.
 - Tenant surfaces: `tenant.bookedai.au` gateway, tenant preview/workspace, catalog, bookings, leads, Ops, integrations, billing, and team/admin access.
-- Operator surfaces: `admin.bookedai.au`, OpenClaw/operator Telegram, deployment scripts, release gates, Notion/Discord sync, and reliability/audit views.
+- Operator surfaces: `admin.bookedai.au`, OpenClaw/operator Telegram, deployment scripts, release gates, Notion/archive sync, optional Discord only when explicitly requested, and reliability/audit views.
 - Backend application layer: FastAPI route modules, `/api/v1/*` contracts, `/api/chat/send`, channel webhooks, public catalog/search, booking, portal, tenant, admin, communication, integration, and lifecycle handlers.
 - Revenue core: contacts, leads, booking intents, booking references, payment posture, portal snapshots, action ledger, audit/outbox records, CRM/email/calendar/payment side effects, and tenant revenue summaries.
 - Messaging Automation Layer: channel webhook -> normalized Inbox/conversation event -> shared booking-care/search policy -> booking/payment/support/action side effects -> provider reply.
 - Data and integration layer: Supabase/Postgres, additive SQL migrations, repository/service boundaries, Stripe/payment posture, Zoho CRM, email, Telegram Bot API, WhatsApp provider adapters, n8n, OpenClaw manifests, Docker/Nginx/Cloudflare deployment.
-- Governance layer: docs-first requirement tracking, implementation-progress tracking, phase/sprint execution docs, release gates, Playwright/API tests, memory notes, Notion publication, and Discord operator summaries.
+- Governance layer: docs-first requirement tracking, implementation-progress tracking, phase/sprint execution docs, release gates, Playwright/API tests, memory notes, Notion/archive publication, and Discord summaries only when explicitly requested.
 
 ### Current phase sequence
 
@@ -303,7 +303,7 @@ The next implementation window must prioritize these in order:
 
 ### Immediate operating rule
 
-Any new product behavior should update this requirement baseline first, then `docs/development/implementation-progress.md`, then the matching phase/sprint plan, then Notion/Discord when operator-visible.
+Any new product behavior should update this requirement baseline first, then `docs/development/implementation-progress.md`, then the matching phase/sprint plan, then Notion/archive when operator-visible. Discord is skipped unless the operator explicitly requests it for the task.
 
 Latest homepage shortcut search update from `2026-04-26`:
 
@@ -1323,10 +1323,10 @@ Live-promotion closure rule:
 - update the corresponding sprint, requirement, or module description document in the same completion pass
 - update the matching roadmap or sprint or phase artifact in the same completion pass
 - treat `implemented + live deployed + documented` as one completion standard
-- when the operator workflow includes Telegram or bot-assisted delivery, also sync the detailed update into Notion and mirror the operator summary into Discord when the change is relevant for team visibility
-- the Discord payload should be the concise summary text itself; Notion is the full-detail payload surface
+- when the operator workflow includes Telegram or bot-assisted delivery, also sync the detailed update into Notion/archive when the change is relevant for operator visibility
+- Discord is no longer a default closeout mirror; post to Discord only when the operator explicitly requests it for the specific task
 - use the BookedAI operator entrypoints to keep this discipline consistent:
-  - `python3 scripts/telegram_workspace_ops.py sync-doc ...` for per-change closeout notes
+  - `python3 scripts/telegram_workspace_ops.py sync-doc ... --skip-discord` for per-change closeout notes unless Discord was explicitly requested
   - `python3 scripts/telegram_workspace_ops.py sync-repo-docs --skip-discord` for full documentation publish passes
   - `python3 scripts/telegram_workspace_ops.py test --command "..."` for repo-scoped validation from Telegram/OpenClaw
   - `python3 scripts/telegram_workspace_ops.py workspace-command --command "..."` for broader Telegram-authorized BookedAI refactors, file-structure changes, and whole-project rollout steps

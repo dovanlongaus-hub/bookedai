@@ -174,7 +174,7 @@ Mỗi phase closeout phải bao gồm:
 1. R lane đăng ký xong evidence (test/UAT/deploy/smoke).
 2. A (PM) review + ký Phase Closeout template.
 3. C lanes confirm không còn outstanding concerns.
-4. I lanes nhận Notion + Discord closeout post.
+4. I lanes nhận Notion/archive closeout post; Discord only when explicitly requested.
 5. PM lưu evidence link vào `implementation-progress.md` + `03-EXECUTION-PLAN.md`.
 
 ## 7. Escalation Path

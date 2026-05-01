@@ -88,7 +88,7 @@ Source: M-02 success criteria in [04-VISION-TARGET-MILESTONES.md](04-VISION-TARG
 | `09:00` | Image promote via `python3 scripts/telegram_workspace_ops.py deploy-live` | TBD — assign before D-2 (DevOps) | Deploy completes; `bash scripts/healthcheck_stack.sh` passes |
 | `09:30` | Production smoke per [CR-010](05-CHANGE-REQUESTS.md): **P0** Manager Bot Telegram inbound (chess + swim) + portal reopen + admin login + **embed widget for AI Mentor 1-1** ([CR-009](05-CHANGE-REQUESTS.md)). **P1** WhatsApp inbound smoke (acceptable if it passes; not a gate per [CR-010](05-CHANGE-REQUESTS.md)). Smoke covers all 3 tenants on their primary channel. | TBD — assign before D-2 (QA + Backend) | All 3 tenant booking confirmable; HMAC valid on Telegram; portal reopens with `v1-*` reference; admin same-origin login works; AI Mentor embed loads + completes booking |
 | `10:30` | Roadmap site + pitch site final smoke — verify `roadmap.bookedai.au` shows synced phases + `pitch.bookedai.au` shows master roadmap image | TBD — assign before D-2 (Frontend + Product/PM) | `roadmap.bookedai.au` lists Phase 0/5/6/7/8/9/17/18/19/20/20.5/21/22/23 + tenant cases; `pitch.bookedai.au#roadmap-execution` renders master SVG; both pages 200 OK |
-| `10:00` | Closeout post (Notion + Discord) via `python3 scripts/telegram_workspace_ops.py sync-doc` | Product/PM | Sign-off recorded; archive entry in `docs/development/telegram-sync/2026-04-30/` |
+| `10:00` | Closeout post to Notion/archive via `python3 scripts/telegram_workspace_ops.py sync-doc --skip-discord` unless Discord was explicitly requested | Product/PM | Sign-off recorded; archive entry in `docs/development/telegram-sync/2026-04-30/` |
 | `10:00 → 14:00` | Rollback hold (4h post-promote, no scope changes) | DevOps + on-call | No P0 incidents; if incident, trigger rollback per §3 |
 | `14:00` | M-02 closeout sign-off | Product/PM + CEO + Engineering lead | Signed in [implementation-progress.md](../../development/implementation-progress.md); CR-001 marked Implemented end-state; Phase 17/18/19 status cards updated |
 
@@ -119,7 +119,7 @@ Source: M-02 success criteria in [04-VISION-TARGET-MILESTONES.md](04-VISION-TARG
 5. Document incident in `docs/development/telegram-sync/2026-04-30/incident-<timestamp>.md`
 6. Notify stakeholders via `python3 scripts/telegram_workspace_ops.py sync-doc`
 
-Per [docs/pm/03-EXECUTION-PLAN.md §1 Phase Gate](../03-EXECUTION-PLAN.md): closeout requires items 5 (live deploy), 6 (live smoke), and 9 (Notion/Discord). Rollback must restore items 5 + 6 to green before declaring incident contained.
+Per [docs/pm/03-EXECUTION-PLAN.md §1 Phase Gate](../03-EXECUTION-PLAN.md): closeout requires items 5 (live deploy), 6 (live smoke), and 9 (Notion/archive by default; Discord only when explicitly requested). Rollback must restore items 5 + 6 to green before declaring incident contained.
 
 ## 4. Owner assignment placeholders
 

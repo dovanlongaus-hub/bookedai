@@ -362,7 +362,7 @@ The immediate post-Sprint-16 working cadence is now locked to:
 
 - freeze scope by Friday, April 24, 2026
 - get AI end-to-end working before any UI polish pass
-- post one one-line daily update in Discord
+- keep a one-line daily operator update in repo/Notion/archive when needed; Discord is skipped unless explicitly requested
 - submit the draft by Saturday, April 25, 2026
 - record a rough video over the April 25-26, 2026 weekend
 - deliver the final edit by Sunday, April 26, 2026
@@ -378,7 +378,7 @@ The post-release implementation order is now:
 4. implement `Phase 20` widget/plugin/web-chat install identity for SME-owned websites and prove one tenant-branded embed flow enters the same AI Revenue Engine end to end
 5. implement `Phase 21` billing, receivable, subscription, reminder, collection, and commission truth after the ledger evidence model is stable
 6. generalize `Phase 22` templates from chess and Future Swim only after both verticals remain green through the release gate, including retention playbooks and channel-specific copy rules
-7. make `Phase 23` release governance the closeout requirement for every phase, including message-intake fixtures, booking/payment/follow-up traces, rollback notes, memory, Notion, and Discord sync
+7. make `Phase 23` release governance the closeout requirement for every phase, including message-intake fixtures, booking/payment/follow-up traces, rollback notes, memory, and Notion/archive sync; Discord only when explicitly requested
  
 
 ## Program status by phase
@@ -1047,7 +1047,7 @@ The seven-lane review captured in `docs/development/full-stack-review-2026-04-26
 - target phases: `17`, `19`, `21`, `23`
 - close P1-1 (`tenant authenticated UAT`), P1-2 (`WhatsApp inline controls + sender identity`), P1-5 (`route_handlers raw SQL → repos`); P1-9 (`Future Swim Miranda URL hotfix`) is closed live
 - one Future Swim revenue loop is documented end-to-end (lead, booking, payment, follow-up, dashboard snapshot)
-- bring up Prometheus/Grafana/AlertManager and route alerts through Discord
+- bring up Prometheus/Grafana/AlertManager and route alerts through the operator-approved alert path; Discord is optional only when explicitly requested
 - activate A/B experiments `AC-1`, `RT-1`, `RT-3`, `CH-1` using the existing `tenant_variant`/`portal_variant` telemetry pattern
 - publish first version of `Commercial and Compliance Checklist`
 - exit gate: at least four A/B experiments have ≥500 impressions per variant with a recorded decision; observability dashboards expose `5xx` rate, DB latency, queue lag
