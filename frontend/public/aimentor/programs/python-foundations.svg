@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" width="320" height="200" role="img" aria-labelledby="t">
+  <title id="t">Python Foundations</title>
+  <rect width="320" height="200" rx="18" fill="#fdfaf3"/>
+  <rect x="8" y="8" width="304" height="184" rx="14" fill="#f8d99a" opacity="0.4"/>
+  <!-- code brackets -->
+  <text x="60" y="130" font-family="ui-monospace, Menlo, monospace" font-size="92" font-weight="700" fill="#0f5c54">{ }</text>
+  <!-- snake curve -->
+  <path d="M150 60 C 200 60 200 110 250 110 C 285 110 285 150 230 150" stroke="#ff6b3d" stroke-width="10" fill="none" stroke-linecap="round"/>
+  <circle cx="150" cy="60" r="8" fill="#ff6b3d"/>
+  <circle cx="148" cy="58" r="2" fill="#fdfaf3"/>
+  <text x="20" y="184" font-family="-apple-system, system-ui, sans-serif" font-size="13" font-weight="600" fill="#1f2a26">Python Foundations</text>
+</svg>

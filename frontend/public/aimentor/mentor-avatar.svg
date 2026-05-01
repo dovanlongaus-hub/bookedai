@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-labelledby="t">
+  <title id="t">AI Mentor</title>
+  <defs>
+    <linearGradient id="sand" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f8d99a"/>
+      <stop offset="100%" stop-color="#e89a5a"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.4" r="0.6">
+      <stop offset="0%" stop-color="#f8d99a" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#fdfaf3" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" fill="#fdfaf3"/>
+  <circle cx="256" cy="256" r="220" fill="url(#glow)"/>
+  <circle cx="256" cy="240" r="180" fill="url(#sand)"/>
+  <!-- Shoulders -->
+  <path d="M96 470 C 130 380 200 350 256 350 C 312 350 382 380 416 470 L 416 512 L 96 512 Z" fill="#1f2a26"/>
+  <!-- Neck -->
+  <rect x="232" y="300" width="48" height="60" rx="14" fill="#1f2a26"/>
+  <!-- Head silhouette -->
+  <ellipse cx="256" cy="230" rx="100" ry="118" fill="#1f2a26"/>
+  <!-- Hair tuft -->
+  <path d="M168 200 C 180 140 240 110 300 130 C 340 145 350 180 348 210 C 320 188 280 180 256 184 C 220 188 188 196 168 200 Z" fill="#1f2a26"/>
+  <!-- Headset band -->
+  <path d="M156 220 C 180 150 332 150 356 220" stroke="#ff6b3d" stroke-width="10" fill="none" stroke-linecap="round"/>
+  <!-- Headset earpieces -->
+  <circle cx="156" cy="232" r="18" fill="#ff6b3d"/>
+  <circle cx="356" cy="232" r="18" fill="#ff6b3d"/>
+  <!-- Mic boom -->
+  <path d="M156 248 C 150 290 180 312 216 312" stroke="#ff6b3d" stroke-width="6" fill="none" stroke-linecap="round"/>
+  <circle cx="220" cy="312" r="8" fill="#ff6b3d"/>
+  <!-- Glasses -->
+  <circle cx="220" cy="232" r="28" fill="none" stroke="#fdfaf3" stroke-width="6"/>
+  <circle cx="296" cy="232" r="28" fill="none" stroke="#fdfaf3" stroke-width="6"/>
+  <line x1="248" y1="232" x2="268" y2="232" stroke="#fdfaf3" stroke-width="6" stroke-linecap="round"/>
+  <!-- Subtle teal highlight on glasses -->
+  <circle cx="212" cy="226" r="6" fill="#0f5c54" opacity="0.5"/>
+  <circle cx="288" cy="226" r="6" fill="#0f5c54" opacity="0.5"/>
+</svg>

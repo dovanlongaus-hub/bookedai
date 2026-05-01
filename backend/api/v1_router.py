@@ -4,6 +4,7 @@ from api.v1_academy_routes import router as academy_router
 from api.v1_admin_tenant_config_routes import router as admin_tenant_config_router
 from api.v1_agent_routes import router as agent_router
 from api.v1_ai_mentor_student_routes import router as ai_mentor_student_router
+from api.v1_aimentor_program_routes import router as aimentor_program_router
 from api.v1_assessment_routes import router as assessment_router
 from api.v1_booking_lifecycle_routes import router as booking_lifecycle_router
 from api.v1_booking_routes import router as booking_router
@@ -23,6 +24,7 @@ from api.v1_search_routes import router as search_router
 from api.v1_tenant_ai_mentor_progress_routes import (
     router as tenant_ai_mentor_progress_router,
 )
+from api.v1_tenant_broadcast_routes import router as tenant_broadcast_router
 from api.v1_tenant_chess_progress_routes import router as tenant_chess_progress_router
 from api.v1_tenant_routes import router as tenant_router
 from api.v1_tenant_zoho_integration_routes import (
@@ -34,6 +36,7 @@ router = APIRouter()
 router.include_router(academy_router)
 router.include_router(agent_router)
 router.include_router(ai_mentor_student_router)
+router.include_router(aimentor_program_router)
 router.include_router(assessment_router)
 router.include_router(search_router)
 router.include_router(booking_router)
@@ -52,6 +55,7 @@ router.include_router(public_tenant_config_router)
 router.include_router(admin_tenant_config_router)
 router.include_router(sandbox_router)
 router.include_router(tenant_ai_mentor_progress_router)
+router.include_router(tenant_broadcast_router)
 router.include_router(tenant_chess_progress_router)
 router.include_router(tenant_router)
 router.include_router(tenant_zoho_integration_router)

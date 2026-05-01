@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96" role="img" aria-labelledby="t">
+  <title id="t">AI Mentor</title>
+  <circle cx="48" cy="48" r="48" fill="#fdfaf3"/>
+  <circle cx="48" cy="46" r="40" fill="#f8d99a"/>
+  <path d="M16 92 C 22 72 36 64 48 64 C 60 64 74 72 80 92 Z" fill="#1f2a26"/>
+  <ellipse cx="48" cy="42" rx="22" ry="26" fill="#1f2a26"/>
+  <path d="M28 40 C 32 28 64 28 68 40" stroke="#ff6b3d" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <circle cx="28" cy="42" r="4" fill="#ff6b3d"/>
+  <circle cx="68" cy="42" r="4" fill="#ff6b3d"/>
+  <circle cx="40" cy="42" r="6" fill="none" stroke="#fdfaf3" stroke-width="2"/>
+  <circle cx="56" cy="42" r="6" fill="none" stroke="#fdfaf3" stroke-width="2"/>
+  <line x1="46" y1="42" x2="50" y2="42" stroke="#fdfaf3" stroke-width="2"/>
+</svg>

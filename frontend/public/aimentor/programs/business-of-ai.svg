@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" width="320" height="200" role="img" aria-labelledby="t">
+  <title id="t">Business of AI</title>
+  <rect width="320" height="200" rx="18" fill="#fdfaf3"/>
+  <rect x="8" y="8" width="304" height="184" rx="14" fill="#f8d99a" opacity="0.4"/>
+  <!-- briefcase -->
+  <g transform="translate(50 70)">
+    <rect x="20" y="0" width="36" height="14" rx="4" fill="none" stroke="#1f2a26" stroke-width="4"/>
+    <rect x="0" y="14" width="76" height="60" rx="8" fill="#0f5c54"/>
+    <rect x="0" y="32" width="76" height="6" fill="#1f2a26" opacity="0.4"/>
+    <rect x="32" y="42" width="12" height="8" rx="2" fill="#f8d99a"/>
+  </g>
+  <!-- chart bars + arrow -->
+  <g transform="translate(170 60)">
+    <rect x="0" y="60" width="16" height="30" rx="3" fill="#1f2a26"/>
+    <rect x="24" y="44" width="16" height="46" rx="3" fill="#1f2a26"/>
+    <rect x="48" y="28" width="16" height="62" rx="3" fill="#1f2a26"/>
+    <rect x="72" y="14" width="16" height="76" rx="3" fill="#1f2a26"/>
+    <!-- up arrow -->
+    <path d="M0 70 L 30 50 L 60 36 L 88 14" stroke="#ff6b3d" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M88 14 L 76 14 L 88 14 L 88 26" stroke="#ff6b3d" stroke-width="4" fill="none" stroke-linecap="round"/>
+  </g>
+  <text x="20" y="184" font-family="-apple-system, system-ui, sans-serif" font-size="13" font-weight="600" fill="#1f2a26">Business of AI</text>
+</svg>

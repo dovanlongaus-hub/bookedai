@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" width="320" height="200" role="img" aria-labelledby="t">
+  <title id="t">Intro to AI</title>
+  <rect width="320" height="200" rx="18" fill="#fdfaf3"/>
+  <rect x="8" y="8" width="304" height="184" rx="14" fill="#f8d99a" opacity="0.45"/>
+  <!-- nodes -->
+  <g fill="#0f5c54">
+    <circle cx="70" cy="70" r="10"/>
+    <circle cx="70" cy="120" r="10"/>
+    <circle cx="160" cy="50" r="10"/>
+    <circle cx="160" cy="100" r="10"/>
+    <circle cx="160" cy="150" r="10"/>
+    <circle cx="250" cy="80" r="10"/>
+    <circle cx="250" cy="130" r="10"/>
+  </g>
+  <g stroke="#ff6b3d" stroke-width="2" fill="none" opacity="0.85">
+    <line x1="70" y1="70" x2="160" y2="50"/>
+    <line x1="70" y1="70" x2="160" y2="100"/>
+    <line x1="70" y1="120" x2="160" y2="100"/>
+    <line x1="70" y1="120" x2="160" y2="150"/>
+    <line x1="160" y1="50" x2="250" y2="80"/>
+    <line x1="160" y1="100" x2="250" y2="80"/>
+    <line x1="160" y1="100" x2="250" y2="130"/>
+    <line x1="160" y1="150" x2="250" y2="130"/>
+  </g>
+  <text x="20" y="184" font-family="-apple-system, system-ui, sans-serif" font-size="13" font-weight="600" fill="#1f2a26">Intro to AI</text>
+</svg>
