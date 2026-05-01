@@ -793,3 +793,78 @@
   flex-direction: column;
   background: var(--fs-surface-soft);
 }
+
+/* Coach dashboard — students table (Phase 3.3) */
+.fs-coach-table {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.fs-coach-row {
+  border-radius: var(--fs-radius-md);
+  border: 1px solid var(--fs-border);
+  background: var(--fs-surface);
+  overflow: hidden;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.fs-coach-row:hover {
+  border-color: var(--fs-primary);
+  box-shadow: var(--fs-shadow-card);
+}
+
+.fs-coach-row-open {
+  border-color: var(--fs-primary);
+  box-shadow: var(--fs-shadow-card-hover);
+}
+
+.fs-coach-row-button {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  padding: 16px 20px;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--fs-font-body);
+  color: inherit;
+}
+
+.fs-coach-row-button:hover,
+.fs-coach-row-button:focus-visible {
+  background: var(--fs-surface-soft);
+  outline: none;
+}
+
+.fs-coach-row-main {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.fs-coach-row-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  color: var(--fs-text-muted);
+}
+
+.fs-coach-write-panel {
+  border-top: 1px solid var(--fs-border);
+  padding: 18px 20px 22px;
+  background: var(--fs-surface-soft);
+}
+
+@media (min-width: 768px) {
+  .fs-coach-write-panel {
+    padding: 22px 24px 26px;
+  }
+}
