@@ -24,7 +24,7 @@ import hmac
 import json
 import os
 import time
-from datetime import date as date_type
+from datetime import date as date_type, datetime as datetime_type
 from typing import Any
 
 from fastapi import Header, Request
@@ -135,6 +135,69 @@ def _isoformat_date(value: Any) -> str | None:
     if isinstance(value, date_type):
         return value.isoformat()
     return str(value)
+
+
+def _isoformat_datetime(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime_type):
+        return value.isoformat()
+    return str(value)
+
+
+async def _load_parent_bookings(session, *, parent_email: str) -> list[dict[str, Any]]:
+    """Load the parent's last 20 booking_intents joined to service merchant
+    profile metadata. Match is by lower(contacts.email) within the
+    futureswim tenant scope so a parent who books from any channel
+    (chat, WhatsApp, marketing form) has their bookings surface here.
+    """
+    rows = (
+        await session.execute(
+            text(
+                """
+                select bi.id::text as booking_intent_id,
+                       bi.booking_reference,
+                       bi.requested_date,
+                       bi.requested_time,
+                       bi.timezone,
+                       bi.service_id,
+                       bi.service_name,
+                       bi.status,
+                       bi.created_at,
+                       smp.name as smp_service_name,
+                       smp.venue_name,
+                       smp.display_price
+                  from booking_intents bi
+                  left join contacts c on c.id = bi.contact_id
+                  left join service_merchant_profiles smp on smp.service_id = bi.service_id
+                 where c.tenant_id = (select id from tenants where slug = 'future-swim')
+                   and lower(c.email) = lower(:parent_email)
+                 order by bi.created_at desc
+                 limit 20
+                """
+            ),
+            {"parent_email": parent_email},
+        )
+    ).mappings().all()
+
+    bookings: list[dict[str, Any]] = []
+    for row in rows:
+        bookings.append(
+            {
+                "booking_intent_id": row["booking_intent_id"],
+                "booking_reference": row["booking_reference"],
+                "requested_date": row["requested_date"],
+                "requested_time": row["requested_time"],
+                "timezone": row["timezone"],
+                "service_id": row["service_id"],
+                "service_name": row["smp_service_name"] or row["service_name"],
+                "venue_name": row["venue_name"],
+                "display_price": row["display_price"],
+                "status": row["status"],
+                "created_at": _isoformat_datetime(row["created_at"]),
+            }
+        )
+    return bookings
 
 
 async def _load_parent_by_id(session, parent_id: str) -> dict[str, Any] | None:
@@ -263,6 +326,10 @@ async def _build_portal_payload(session, parent_row: dict[str, Any]) -> dict[str
             }
         )
 
+    bookings_payload = await _load_parent_bookings(
+        session, parent_email=str(parent_row["email"] or "")
+    )
+
     return {
         "parent": {
             "email": parent_row["email"],
@@ -272,6 +339,7 @@ async def _build_portal_payload(session, parent_row: dict[str, Any]) -> dict[str
             "preferred_locale": parent_row["preferred_locale"],
         },
         "students": students_payload,
+        "bookings": bookings_payload,
     }
 
 
@@ -526,108 +594,10 @@ async def futureswim_portal_preview(request: Request):
                 actor_context=None,
             )
 
-        parent_id = str(parent_row["id"])
-
-        students = (
-            await session.execute(
-                text(
-                    """
-                    select id, full_name, date_of_birth, centre_code,
-                           current_level_code, enrolled_since, notes_for_coach
-                      from futureswim_student_profiles
-                     where parent_id = :parent_id
-                       and is_active = 1
-                     order by enrolled_since asc nulls last, full_name asc
-                    """
-                ),
-                {"parent_id": parent_id},
-            )
-        ).mappings().all()
-
-        students_payload: list[dict[str, Any]] = []
-        for student in students:
-            student_id = str(student["id"])
-
-            progress_rows = (
-                await session.execute(
-                    text(
-                        """
-                        select session_date, centre_code, level_code,
-                               attendance, focus_skill, notes_md, coach_initials
-                          from futureswim_student_progress
-                         where student_id = :student_id
-                         order by session_date desc
-                         limit 12
-                        """
-                    ),
-                    {"student_id": student_id},
-                )
-            ).mappings().all()
-
-            evaluation_row = (
-                await session.execute(
-                    text(
-                        """
-                        select evaluated_at, level_code, level_outcome,
-                               strengths_md, areas_to_work_on_md,
-                               next_step_level_code, next_step_summary, coach_initials
-                          from futureswim_teacher_evaluations
-                         where student_id = :student_id
-                         order by evaluated_at desc
-                         limit 1
-                        """
-                    ),
-                    {"student_id": student_id},
-                )
-            ).mappings().first()
-
-            students_payload.append(
-                {
-                    "id": student_id,
-                    "full_name": student["full_name"],
-                    "date_of_birth": _isoformat_date(student["date_of_birth"]),
-                    "centre_code": student["centre_code"],
-                    "current_level_code": student["current_level_code"],
-                    "enrolled_since": _isoformat_date(student["enrolled_since"]),
-                    "notes_for_coach": student["notes_for_coach"],
-                    "recent_progress": [
-                        {
-                            "session_date": _isoformat_date(row["session_date"]),
-                            "centre_code": row["centre_code"],
-                            "level_code": row["level_code"],
-                            "attendance": row["attendance"],
-                            "focus_skill": row["focus_skill"],
-                            "notes_md": row["notes_md"],
-                            "coach_initials": row["coach_initials"],
-                        }
-                        for row in progress_rows
-                    ],
-                    "latest_evaluation": (
-                        {
-                            "evaluated_at": _isoformat_date(evaluation_row["evaluated_at"]),
-                            "level_code": evaluation_row["level_code"],
-                            "level_outcome": evaluation_row["level_outcome"],
-                            "strengths_md": evaluation_row["strengths_md"],
-                            "areas_to_work_on_md": evaluation_row["areas_to_work_on_md"],
-                            "next_step_level_code": evaluation_row["next_step_level_code"],
-                            "next_step_summary": evaluation_row["next_step_summary"],
-                            "coach_initials": evaluation_row["coach_initials"],
-                        }
-                        if evaluation_row is not None
-                        else None
-                    ),
-                }
-            )
-
-    payload = {
-        "parent": {
-            "email": parent_row["email"],
-            "full_name": parent_row["full_name"],
-            "phone": parent_row["phone"],
-            "centre_code": parent_row["centre_code"],
-            "preferred_locale": parent_row["preferred_locale"],
-        },
-        "students": students_payload,
-    }
+        # Phase 3.2C: share the same payload builder as /me so the preview
+        # endpoint also returns the parent's bookings array. Demo / preview
+        # parents who have a contacts row + booking_intents matched by email
+        # will see their bookings; otherwise the array is empty.
+        payload = await _build_portal_payload(session, parent_row)
 
     return _success_response(payload, tenant_id=None, actor_context=None)

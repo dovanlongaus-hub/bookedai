@@ -41,9 +41,24 @@ export type FutureSwimParentSummary = {
   preferred_locale: string | null;
 };
 
+export type FutureSwimBookingSummary = {
+  booking_intent_id: string;
+  booking_reference: string | null;
+  requested_date: string | null;
+  requested_time: string | null;
+  timezone: string | null;
+  service_id: string | null;
+  service_name: string | null;
+  venue_name: string | null;
+  display_price: string | null;
+  status: string | null;
+  created_at: string | null;
+};
+
 export type FutureSwimPortalPayload = {
   parent: FutureSwimParentSummary;
   students: FutureSwimStudentSummary[];
+  bookings?: FutureSwimBookingSummary[];
 };
 
 export type FutureSwimPortalResponse =
