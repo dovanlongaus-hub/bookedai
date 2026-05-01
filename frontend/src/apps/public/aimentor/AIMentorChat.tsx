@@ -565,6 +565,7 @@ export function AIMentorChat({ programs, locale, mentorInitials = 'LV' }: AIMent
   const [voiceMode, setVoiceMode] = useState(false);
   const [voiceListening, setVoiceListening] = useState(false);
   const [pendingSpeak, setPendingSpeak] = useState<string | null>(null);
+  const lastSpokenIdRef = useRef<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom on new message
@@ -886,15 +887,23 @@ export function AIMentorChat({ programs, locale, mentorInitials = 'LV' }: AIMent
     [handleQuery],
   );
 
-  // Voice ← text: when voice mode is on, speak each new assistant text message
-  // once. Non-text payloads (programs/slots/contact_form/etc.) are skipped.
+  // Voice ← text: speak each new assistant text message once when voice mode is on.
+  // The chat appends non-text payloads (programs/slots/contact_form/typing) AFTER
+  // each text reply, so messages[messages.length - 1] is rarely text. Scan back
+  // for the most-recent assistant text and dedupe via lastSpokenIdRef so toggling
+  // voice off→on doesn't re-speak the same message.
   useEffect(() => {
     if (!voiceMode) return;
-    const last = messages[messages.length - 1];
-    if (!last || last.role !== 'assistant') return;
-    if (last.kind !== 'text') return;
-    if (typeof last.body !== 'string' || !last.body.trim()) return;
-    setPendingSpeak(last.body);
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i];
+      if (msg.role !== 'assistant') continue;
+      if (msg.kind !== 'text') continue;
+      if (typeof msg.body !== 'string' || !msg.body.trim()) continue;
+      if (lastSpokenIdRef.current === msg.id) return;
+      lastSpokenIdRef.current = msg.id;
+      setPendingSpeak(msg.body);
+      return;
+    }
   }, [messages, voiceMode]);
 
   const handleStartOver = useCallback(() => {
