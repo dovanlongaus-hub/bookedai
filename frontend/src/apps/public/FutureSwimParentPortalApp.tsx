@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowRight,
+  CalendarDays,
   CheckCircle2,
   Clock,
   Compass,
@@ -16,6 +17,7 @@ import { FUTURE_SWIM_CENTRES } from './futureswim/centres';
 import { FUTURE_SWIM_LEVELS } from './futureswim/levels';
 import {
   FUTURE_SWIM_DEMO_PORTAL_KEY,
+  type FutureSwimBookingSummary,
   type FutureSwimEvaluation,
   type FutureSwimParentSummary,
   type FutureSwimPortalPayload,
@@ -97,6 +99,99 @@ function renderMarkdownBullets(md: string | null) {
         </li>
       ))}
     </ul>
+  );
+}
+
+const BOOKING_STATUS_LABEL: Record<string, string> = {
+  draft: 'Draft',
+  pending: 'Pending',
+  pending_payment: 'Pending payment',
+  confirmed: 'Confirmed',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+  refunded: 'Refunded',
+  no_show: 'No-show',
+};
+
+function bookingStatusLabel(status: string | null): string {
+  if (!status) return 'Pending';
+  return BOOKING_STATUS_LABEL[status] || status.replace(/_/g, ' ');
+}
+
+function isCancelledStatus(status: string | null): boolean {
+  if (!status) return false;
+  return status === 'cancelled' || status === 'refunded' || status === 'no_show';
+}
+
+function formatBookingTime(date: string | null, time: string | null): string {
+  const d = formatDate(date);
+  if (!time) return d;
+  return `${d} · ${time}`;
+}
+
+function BookingsSection({ bookings }: { bookings: FutureSwimBookingSummary[] }) {
+  if (!bookings.length) return null;
+  return (
+    <section className="mt-6">
+      <header className="flex items-end justify-between gap-3">
+        <div>
+          <div className="fs-kicker">Your bookings</div>
+          <h2 className="fs-section-title mt-2">Your bookings</h2>
+          <p className="mt-1 text-sm text-[color:var(--fs-text-muted)]">
+            Recent lessons you've booked across Future Swim centres. Reply to your confirmation email or message us on WhatsApp to reschedule.
+          </p>
+        </div>
+        <span className="fs-chip" aria-label={`${bookings.length} booking${bookings.length === 1 ? '' : 's'}`}>
+          <CalendarDays size={12} aria-hidden="true" /> {bookings.length}
+        </span>
+      </header>
+      <ol className="mt-4 grid gap-3 md:grid-cols-2">
+        {bookings.map((booking) => {
+          const cancelled = isCancelledStatus(booking.status);
+          return (
+            <li key={booking.booking_intent_id} className="fs-card-flat">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="text-sm font-semibold text-[color:var(--fs-text)]">
+                  {booking.service_name || 'Future Swim lesson'}
+                </div>
+                <span
+                  className={`fs-chip ${cancelled ? 'fs-chip-warn' : ''}`}
+                  aria-label={`Status: ${bookingStatusLabel(booking.status)}`}
+                >
+                  {bookingStatusLabel(booking.status)}
+                </span>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[color:var(--fs-text-muted)]">
+                <Clock size={12} aria-hidden="true" />
+                <span>{formatBookingTime(booking.requested_date, booking.requested_time)}</span>
+                {booking.timezone ? <span>· {booking.timezone}</span> : null}
+              </div>
+              {booking.venue_name ? (
+                <div className="mt-1 flex items-center gap-1 text-xs text-[color:var(--fs-text-muted)]">
+                  <MapPin size={12} aria-hidden="true" />
+                  <span>{booking.venue_name}</span>
+                </div>
+              ) : null}
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+                {booking.display_price ? (
+                  <span className="font-semibold text-[color:var(--fs-text)]">{booking.display_price}</span>
+                ) : (
+                  <span />
+                )}
+                {booking.booking_reference ? (
+                  <span
+                    className="font-mono uppercase tracking-[0.18em] text-[color:var(--fs-text-soft)]"
+                    aria-label={`Booking reference ${booking.booking_reference}`}
+                  >
+                    {booking.booking_reference}
+                  </span>
+                ) : null}
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
   );
 }
 
@@ -606,6 +701,7 @@ export function FutureSwimParentPortalApp() {
           {summary ? (
             <>
               <ParentGreeting parent={summary.parent} isDemo={isDemo} />
+              <BookingsSection bookings={summary.bookings ?? []} />
               {summary.students.length === 0 ? (
                 <div className="fs-card-flat mt-6 text-sm text-[color:var(--fs-text-muted)]">
                   No students are linked to this account yet. Email your Future Swim centre and we'll get them set up.

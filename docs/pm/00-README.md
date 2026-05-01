@@ -38,6 +38,7 @@ Pack này phục vụ ba audience:
 | 07 | [07-CODE-REVIEW-GATES.md](07-CODE-REVIEW-GATES.md) | Code review checklist mỗi phase: Code Quality, Architecture, Testing, Requirements, Production Readiness; severity gating | [release-gate-checklist.md](../development/release-gate-checklist.md), [source-code-review-and-security-hardening-2026-04-26.md](../development/source-code-review-and-security-hardening-2026-04-26.md), [full-stack-review-2026-04-26.md](../development/full-stack-review-2026-04-26.md) |
 | 08 | [08-MERGE-MAP.md](08-MERGE-MAP.md) | Crosswalk: tài liệu cũ → mục PM pack; mâu thuẫn được hoà giải | toàn bộ `docs/architecture/` và `docs/development/` |
 | 09 | [09-OPEN-QUESTIONS.md](09-OPEN-QUESTIONS.md) | Câu hỏi/quyết định cần leadership; ai quyết, đang chặn gì, gợi ý phương án | full-stack-review, prd, project, sprint dependency map |
+| 12 | [12-FUTURESWIM-FEATURE-REQUIREMENTS-AND-STATUS.md](12-FUTURESWIM-FEATURE-REQUIREMENTS-AND-STATUS.md) | Future Swim sub-project — 18 verbatim requirements (2026-04-30 + 2026-05-01), delivery status, PR refs, architecture decisions, deferred roadmap | user requirement intake (2026-04-30 + 2026-05-01), futureswim PRs #22-#25 + #28 |
 
 ## Quy trình cập nhật
 
