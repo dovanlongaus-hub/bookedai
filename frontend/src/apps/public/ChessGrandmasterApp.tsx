@@ -665,7 +665,7 @@ const dict = {
       reset: 'Reset',
       inputPlaceholder: 'Type a message…',
       send: 'Send',
-      voiceTooltip: 'Voice coming soon',
+      voiceTooltip: 'Voice mode — tap to talk',
       intro:
         "Hi! I'm here to help you find the right chess class with WGM Mai Hưng. What are you looking for?",
       searching: 'Looking through the academy catalog…',
@@ -1132,7 +1132,7 @@ const dict = {
       reset: 'Bắt đầu lại',
       inputPlaceholder: 'Nhập tin nhắn…',
       send: 'Gửi',
-      voiceTooltip: 'Tính năng giọng nói sắp ra mắt',
+      voiceTooltip: 'Chế độ giọng nói — chạm để nói',
       intro:
         'Xin chào! Tôi giúp bạn tìm lớp cờ vua phù hợp với WGM Mai Hưng. Bạn đang quan tâm điều gì?',
       searching: 'Đang tìm trong học viện…',
@@ -1365,6 +1365,19 @@ export function ChessGrandmasterApp() {
       }
     }
   }, []);
+
+  // Phase 4 §5: voice command can request a locale switch from inside the chat.
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    function onLocaleSwitch(event: Event) {
+      const detail = (event as CustomEvent<{ target?: 'en' | 'vi' }>).detail;
+      const target = detail?.target;
+      if (target === 'en' || target === 'vi') setLocale(target);
+    }
+    window.addEventListener('chess-chat-locale-switch', onLocaleSwitch as EventListener);
+    return () =>
+      window.removeEventListener('chess-chat-locale-switch', onLocaleSwitch as EventListener);
+  }, [setLocale]);
 
   const [floatingHidden, setFloatingHidden] = useState(false);
   const bookSectionRef = useRef<HTMLElement | null>(null);
