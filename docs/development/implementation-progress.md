@@ -3432,3 +3432,9 @@ The `bookedai.au` public assistant now keeps lead capture on the public tenant-s
   - MEDIUM — AIMentorAccountApp Progress tab UI. Backend `orchestrate_status_update` (commit 95659ae) already feeds the timeline; only frontend work remaining.
   - LOW — WhatsApp interactive list / template approval for full programs flow parity. Currently Telegram is full inline-keyboard, WhatsApp falls back to a web deep link. Needs Meta template approval cycle (~1 week) before code can ship.
 - verification: `cd frontend && npx tsc --noEmit` shows no new AIMentorChat errors (pre-existing unrelated errors in StudentPortalSections + FutureSwimParentPortalApp untouched). Existing `frontend/tests/aimentor-voice-mode.spec.ts` still asserts correct behaviour because the new logic is a strict superset of the old (it speaks text messages whether or not a non-text payload trails them).
+
+## 2026-05-01 Branch Merge And Requirement-Doc Cleanup
+
+- update: merged the remaining unique branch work into `main`, including Future Swim Phase 4 broadcast/monthly reminder requirements, the OpenClaw/internal API bridge and workflow smoke branch, and the local Telegram booking/payment follow-up branch.
+- update: confirmed the remaining requirement/doc worktree branches are patch-equivalent with `main`; remote branches were deleted after `main` was pushed, while local locked worktree branches were left in place and detached from gone upstreams to avoid interrupting active agent worktrees.
+- verification: `git cherry -v main ...` showed remaining worktree branches as patch-equivalent; `python3 -m py_compile` passed for touched backend/internal bridge files; `frontend/package.json` parsed successfully; `git diff --cached --check` passed during conflict resolution; `main` pushed to `origin/main` at `9bf34da`.
