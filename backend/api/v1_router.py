@@ -4,6 +4,7 @@ from api.v1_academy_routes import router as academy_router
 from api.v1_admin_tenant_config_routes import router as admin_tenant_config_router
 from api.v1_agent_routes import router as agent_router
 from api.v1_ai_mentor_student_routes import router as ai_mentor_student_router
+from api.v1_aimentor_chat_routes import router as aimentor_chat_router
 from api.v1_aimentor_program_routes import router as aimentor_program_router
 from api.v1_assessment_routes import router as assessment_router
 from api.v1_booking_lifecycle_routes import router as booking_lifecycle_router
@@ -37,6 +38,7 @@ router = APIRouter()
 router.include_router(academy_router)
 router.include_router(agent_router)
 router.include_router(ai_mentor_student_router)
+router.include_router(aimentor_chat_router)
 router.include_router(aimentor_program_router)
 router.include_router(assessment_router)
 router.include_router(search_router)

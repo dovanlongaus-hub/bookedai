@@ -87,6 +87,13 @@ export interface ChessBookingChatDictionary {
   ctaBanner: string;
   defaultName: string;
   bookingError: string;
+  /** Phase 4 §5 voice mode (optional — falls back to defaults if absent). */
+  voiceListening?: string;
+  voiceStopped?: string;
+  voiceUnsupported?: string;
+  voiceLocaleSwitched?: (target: 'en' | 'vi') => string;
+  voiceCourseListSummary?: (count: number, firstName: string) => string;
+  voiceSlotListSummary?: (count: number) => string;
 }
 
 interface ChessBookingChatProps {
@@ -186,6 +193,125 @@ function nextId(prefix: string): string {
   messageCounter += 1;
   return `${prefix}-${messageCounter}`;
 }
+
+// --- Phase 4 §5 voice mode --------------------------------------------------
+
+type BrowserSpeechRecognitionResult = {
+  readonly 0: { transcript: string; confidence: number };
+  readonly isFinal: boolean;
+};
+type BrowserSpeechRecognitionEvent = Event & {
+  resultIndex: number;
+  results: ArrayLike<BrowserSpeechRecognitionResult>;
+};
+type BrowserSpeechRecognitionErrorEvent = Event & { error: string };
+type BrowserSpeechRecognition = {
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  onresult: ((event: BrowserSpeechRecognitionEvent) => void) | null;
+  onerror: ((event: BrowserSpeechRecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+  onstart: (() => void) | null;
+};
+type BrowserSpeechRecognitionConstructor = new () => BrowserSpeechRecognition;
+
+function getSpeechRecognitionCtor(): BrowserSpeechRecognitionConstructor | null {
+  if (typeof window === 'undefined') return null;
+  const w = window as Window &
+    Partial<{
+      SpeechRecognition: BrowserSpeechRecognitionConstructor;
+      webkitSpeechRecognition: BrowserSpeechRecognitionConstructor;
+    }>;
+  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
+}
+
+type VoiceIntent =
+  | { kind: 'locale-switch'; target: 'en' | 'vi' }
+  | { kind: 'numeric-pick'; index: number }
+  | { kind: 'affirm' }
+  | { kind: 'deny' }
+  | { kind: 'skip' }
+  | { kind: 'text'; value: string };
+
+function classifyVoiceIntent(transcript: string): VoiceIntent {
+  const raw = transcript.trim();
+  const t = raw.toLowerCase();
+  if (!t) return { kind: 'text', value: '' };
+
+  // Locale switch: "speak Vietnamese", "switch to English", "tiếng Việt", "nói tiếng Anh"
+  if (/(speak|switch\s+to|change\s+to|nói|chuyển)\s+(vietnamese|tiếng\s*việt|vn)/.test(t)) {
+    return { kind: 'locale-switch', target: 'vi' };
+  }
+  if (/(speak|switch\s+to|change\s+to|nói|chuyển)\s+(english|tiếng\s*anh|en)/.test(t)) {
+    return { kind: 'locale-switch', target: 'en' };
+  }
+
+  // Numeric pick: "1", "option 2", "first", "thứ ba", "một", "hai", ...
+  const numericMap: Record<string, number> = {
+    '1': 0, '2': 1, '3': 2, '4': 3, '5': 4, '6': 5, '7': 6, '8': 7,
+    one: 0, two: 1, three: 2, four: 3, five: 4, six: 5, seven: 6, eight: 7,
+    first: 0, second: 1, third: 2, fourth: 3, fifth: 4, sixth: 5, seventh: 6, eighth: 7,
+    'một': 0, 'hai': 1, 'ba': 2, 'bốn': 3, 'năm': 4, 'sáu': 5, 'bảy': 6, 'tám': 7,
+    'thứ một': 0, 'thứ nhất': 0, 'thứ hai': 1, 'thứ ba': 2, 'thứ bốn': 3, 'thứ tư': 3, 'thứ năm': 4,
+  };
+  const numericMatch = t.match(
+    /^(?:option\s+|number\s+|chọn\s+|số\s+|the\s+|cái\s+)?((?:thứ\s+)?(?:một|hai|ba|bốn|tư|năm|sáu|bảy|tám)|first|second|third|fourth|fifth|sixth|seventh|eighth|one|two|three|four|five|six|seven|eight|[1-8])\b/,
+  );
+  if (numericMatch) {
+    const key = numericMatch[1].replace(/\s+/g, ' ').trim();
+    if (key in numericMap) return { kind: 'numeric-pick', index: numericMap[key] };
+  }
+
+  // Skip
+  if (/\b(skip|next|move\s+on|bỏ\s*qua|tiếp|bỏ)\b/.test(t)) {
+    return { kind: 'skip' };
+  }
+
+  // Yes
+  if (/^(yes|yeah|yep|yup|sure|ok|okay|confirm|đồng\s*ý|được|có|chốt|xác\s*nhận)\b/.test(t)) {
+    return { kind: 'affirm' };
+  }
+
+  // No
+  if (/^(no|nope|cancel|nah|không|hủy|đừng|không\s*được)\b/.test(t)) {
+    return { kind: 'deny' };
+  }
+
+  return { kind: 'text', value: raw };
+}
+
+const DEFAULT_VOICE_COPY = {
+  en: {
+    listening: 'Listening… speak now.',
+    stopped: 'Voice off.',
+    unsupported: 'Voice mode is not supported in this browser. Please type instead.',
+    localeSwitched: (target: 'en' | 'vi') =>
+      target === 'vi' ? 'Switched voice to Vietnamese.' : 'Switched voice to English.',
+    courseSummary: (count: number, first: string) =>
+      count <= 1
+        ? `One match: ${first}.`
+        : `${count} matches. Top pick: ${first}. Tap a card or say "one", "two"…`,
+    slotSummary: (count: number) =>
+      count <= 1 ? 'One session available.' : `${count} sessions. Say "one", "two"… to pick.`,
+  },
+  vi: {
+    listening: 'Đang nghe… mời bạn nói.',
+    stopped: 'Đã tắt giọng nói.',
+    unsupported: 'Trình duyệt chưa hỗ trợ chế độ giọng nói. Vui lòng gõ tin nhắn.',
+    localeSwitched: (target: 'en' | 'vi') =>
+      target === 'vi' ? 'Đã chuyển giọng nói sang tiếng Việt.' : 'Switched voice to English.',
+    courseSummary: (count: number, first: string) =>
+      count <= 1
+        ? `Có 1 lớp phù hợp: ${first}.`
+        : `${count} lớp phù hợp. Nổi bật: ${first}. Chạm thẻ hoặc nói "một", "hai"…`,
+    slotSummary: (count: number) =>
+      count <= 1 ? 'Có 1 buổi học.' : `${count} buổi học. Nói "một", "hai"… để chọn.`,
+  },
+} as const;
 
 function formatSlotLabel(slot: ChessCourseSlot, locale: ChessBookingChatLocale): string {
   const dateText = slot.date || slot.starts_at;
@@ -448,6 +574,15 @@ export function ChessBookingChat({
   const inputRef = useRef<HTMLInputElement | null>(null);
   const threadRef = useRef<HTMLDivElement | null>(null);
 
+  // Phase 4 §5 voice mode
+  const [voiceSupported, setVoiceSupported] = useState<boolean>(false);
+  const [voiceListening, setVoiceListening] = useState<boolean>(false);
+  const [voiceTtsEnabled, setVoiceTtsEnabled] = useState<boolean>(false);
+  const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
+  const lastSpokenIdRef = useRef<string | null>(null);
+  const handleVoiceTranscriptRef = useRef<((t: string) => void) | null>(null);
+  const voiceCopy = DEFAULT_VOICE_COPY[locale];
+
   // Keep the chat localised when the page-level locale toggles.
   useEffect(() => {
     setMessages((current) => {
@@ -691,6 +826,202 @@ export function ChessBookingChat({
     setStep('collectingName');
     appendBot(dict.collectingName);
   }, [appendBot, dict.collectingName]);
+
+  // Phase 4 §5 — voice intent dispatcher.
+  // Routes a transcript into the appropriate state-machine action.
+  const handleVoiceTranscript = useCallback(
+    (transcript: string) => {
+      const intent = classifyVoiceIntent(transcript);
+
+      if (intent.kind === 'locale-switch') {
+        // Locale lives in the parent app — dispatch a custom event for it to listen on.
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('chess-chat-locale-switch', { detail: { target: intent.target } }),
+          );
+        }
+        const fallback = (DEFAULT_VOICE_COPY[intent.target]).localeSwitched(intent.target);
+        appendBot(dict.voiceLocaleSwitched ? dict.voiceLocaleSwitched(intent.target) : fallback);
+        return;
+      }
+
+      if (intent.kind === 'numeric-pick') {
+        // Look at the most recent courses-or-slots bubble and pick at intent.index.
+        const latest = [...messages].reverse().find((m) => m.kind === 'courses' || m.kind === 'slots');
+        if (latest && latest.kind === 'courses') {
+          const course = latest.courses[intent.index];
+          if (course) {
+            handleCourseSelect(course);
+            return;
+          }
+        } else if (latest && latest.kind === 'slots') {
+          const slot = latest.slots[intent.index];
+          if (slot) {
+            handleSlotSelect(slot);
+            return;
+          }
+        }
+        // Numeric without a list visible — fall through to text.
+      }
+
+      if (intent.kind === 'skip' && step === 'collectingPhone') {
+        handleSkipPhone();
+        return;
+      }
+
+      if (intent.kind === 'affirm' && step === 'reviewing') {
+        // "Confirm" on the review card — surface the original text + let the
+        // explicit Confirm button still drive submission. Echo the user word.
+        appendUser(transcript.trim());
+        return;
+      }
+
+      if (intent.kind === 'deny' && step === 'reviewing') {
+        // Treat as "edit" — re-collect name.
+        appendUser(transcript.trim());
+        handleEditDetails();
+        return;
+      }
+
+      // Fallback: pipe the transcript into the existing text input pipeline.
+      const value = intent.kind === 'text' ? intent.value : transcript.trim();
+      if (!value) return;
+      handleSendInput(value);
+    },
+    [
+      appendBot,
+      appendUser,
+      dict.voiceLocaleSwitched,
+      handleCourseSelect,
+      handleEditDetails,
+      handleSendInput,
+      handleSkipPhone,
+      handleSlotSelect,
+      messages,
+      step,
+    ],
+  );
+
+  // Keep the latest handler in a ref so the recognition's onresult always
+  // dispatches against the current state without recreating the instance.
+  useEffect(() => {
+    handleVoiceTranscriptRef.current = handleVoiceTranscript;
+  }, [handleVoiceTranscript]);
+
+  // Initialise the SpeechRecognition instance once the component mounts.
+  // Locale changes update `instance.lang` in-place rather than recreating.
+  useEffect(() => {
+    const Ctor = getSpeechRecognitionCtor();
+    if (!Ctor) {
+      setVoiceSupported(false);
+      return undefined;
+    }
+    setVoiceSupported(true);
+    const instance = new Ctor();
+    instance.continuous = false;
+    instance.interimResults = false;
+    instance.lang = locale === 'vi' ? 'vi-VN' : 'en-AU';
+    instance.onresult = (event) => {
+      const last = event.results[event.results.length - 1];
+      if (!last) return;
+      const transcript = last[0]?.transcript ?? '';
+      if (transcript.trim()) handleVoiceTranscriptRef.current?.(transcript);
+    };
+    instance.onerror = () => {
+      setVoiceListening(false);
+    };
+    instance.onend = () => {
+      setVoiceListening(false);
+    };
+    recognitionRef.current = instance;
+    return () => {
+      try {
+        instance.abort();
+      } catch {
+        /* noop */
+      }
+      recognitionRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Apply locale-aware recognition.lang when the page locale toggles
+  // (avoids recreating the instance + interrupting any in-flight listening).
+  useEffect(() => {
+    if (recognitionRef.current) {
+      recognitionRef.current.lang = locale === 'vi' ? 'vi-VN' : 'en-AU';
+    }
+  }, [locale]);
+
+  const toggleVoiceListening = useCallback(() => {
+    const rec = recognitionRef.current;
+    if (!rec) {
+      appendBot(dict.voiceUnsupported || voiceCopy.unsupported);
+      return;
+    }
+    if (voiceListening) {
+      try {
+        rec.stop();
+      } catch {
+        /* noop */
+      }
+      setVoiceListening(false);
+      return;
+    }
+    try {
+      rec.start();
+      setVoiceListening(true);
+      setVoiceTtsEnabled(true); // implicit consent: once listening, also speak replies
+      appendBot(dict.voiceListening || voiceCopy.listening);
+    } catch {
+      setVoiceListening(false);
+    }
+  }, [appendBot, dict.voiceListening, dict.voiceUnsupported, voiceCopy.listening, voiceCopy.unsupported, voiceListening]);
+
+  // TTS: speak the latest bot text message + summary lines for course/slot bubbles.
+  useEffect(() => {
+    if (!voiceTtsEnabled) return;
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+    if (!messages.length) return;
+
+    // Walk backwards to find the last "speakable" message we haven't read out yet.
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      const msg = messages[i];
+      if (lastSpokenIdRef.current === msg.id) return; // already-spoken seen — bail
+      let text: string | null = null;
+      if (msg.kind === 'bot') text = msg.text;
+      else if (msg.kind === 'courses') {
+        const count = msg.courses.length;
+        const firstName = msg.courses[0]?.name ?? '';
+        text = (dict.voiceCourseListSummary
+          ? dict.voiceCourseListSummary(count, firstName)
+          : voiceCopy.courseSummary(count, firstName));
+      } else if (msg.kind === 'slots') {
+        const count = msg.slots.length;
+        text = (dict.voiceSlotListSummary
+          ? dict.voiceSlotListSummary(count)
+          : voiceCopy.slotSummary(count));
+      }
+      if (text) {
+        try {
+          const utter = new SpeechSynthesisUtterance(text);
+          utter.lang = locale === 'vi' ? 'vi-VN' : 'en-AU';
+          window.speechSynthesis.cancel();
+          window.speechSynthesis.speak(utter);
+        } catch {
+          /* noop */
+        }
+        lastSpokenIdRef.current = msg.id;
+        return;
+      }
+      // Other message kinds (review/payment/order/typing/user) — skip but still mark
+      // as seen so we don't re-speak anything before them.
+      if (msg.kind === 'user' || msg.kind === 'typing') {
+        lastSpokenIdRef.current = msg.id;
+        return;
+      }
+    }
+  }, [messages, voiceTtsEnabled, locale, dict.voiceCourseListSummary, dict.voiceSlotListSummary, voiceCopy]);
 
   const loadPaymentOptions = useCallback(
     async (card: OrderCard) => {
@@ -1305,8 +1636,11 @@ export function ChessBookingChat({
           type="button"
           className="chess-chat-icon-btn"
           aria-label={dict.voiceTooltip}
+          aria-pressed={voiceListening}
           title={dict.voiceTooltip}
-          disabled
+          onClick={toggleVoiceListening}
+          disabled={!voiceSupported}
+          data-listening={voiceListening || undefined}
         >
           <VoiceIcon />
         </button>
