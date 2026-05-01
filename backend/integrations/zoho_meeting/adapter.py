@@ -259,6 +259,58 @@ class ZohoMeetingAdapter:
             "status": str(response_data.get("status") or "deleted"),
         }
 
+    async def update_meeting_time(
+        self,
+        settings: Settings,
+        *,
+        meeting_id: str,
+        new_start_at: datetime,
+        duration_minutes: int,
+        timezone_label: str = "Australia/Sydney",
+    ) -> dict[str, Any]:
+        """Update an existing Zoho Meeting session's start time + duration.
+
+        Mirrors ``create_meeting``'s body shape (``startTime``/``duration``/
+        ``timezone``) but targets an existing session via PUT on
+        ``/{user_id}/sessions/{meeting_id}``. Used when a booking is
+        rescheduled.
+        """
+        if new_start_at.tzinfo is None:
+            raise ValueError(
+                "update_meeting_time requires a timezone-aware new_start_at."
+            )
+        if duration_minutes <= 0:
+            raise ValueError("duration_minutes must be positive.")
+
+        access_token = await self.get_access_token(settings)
+        api_base = self._resolve_api_base_url(settings)
+        user_id = self._resolve_user_id(settings)
+        # Same UTC-normalised ISO-8601 with Z suffix as create_meeting.
+        start_iso = new_start_at.astimezone(timezone.utc).isoformat().replace(
+            "+00:00", "Z"
+        )
+
+        body: dict[str, Any] = {
+            "startTime": start_iso,
+            "duration": int(duration_minutes),
+            "timezone": timezone_label,
+        }
+
+        response_data = await self._request(
+            access_token=access_token,
+            method="PUT",
+            url=f"{api_base}/{user_id}/sessions/{meeting_id}",
+            json_body=body,
+        )
+
+        return {
+            "provider": self.provider_name,
+            "meeting_id": meeting_id,
+            "start_time_iso": start_iso,
+            "duration_minutes": int(duration_minutes),
+            "status": str(response_data.get("status") or "updated"),
+        }
+
     async def _request(
         self,
         *,

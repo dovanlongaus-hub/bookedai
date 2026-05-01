@@ -27,6 +27,10 @@ from repositories.tenant_repository import TenantRepository
 from schemas import TawkMessage
 from service_layer.calls_scheduling import build_qr_code_url
 from service_layer.communication_service import CommunicationService
+from service_layer.lifecycle_ops_service import (
+    orchestrate_booking_cancelled,
+    orchestrate_booking_rescheduled,
+)
 from service_layer.messaging_experiments import (
     assign_arm,
     experiment_arm_summary,
@@ -431,6 +435,48 @@ class MessagingAutomationService:
         ):
             cancel_intent_locked = True
 
+        cancel_confirm_decision = self._parse_cancel_confirm_callback(
+            message.text,
+            session_metadata=channel_state.get("session_metadata") if isinstance(channel_state, dict) else None,
+        )
+        if cancel_confirm_decision is not None:
+            decision, decision_booking_ref = cancel_confirm_decision
+            if decision == "yes":
+                return await self._handle_cancel_confirm(
+                    session,
+                    channel=normalized_channel,
+                    conversation_id=conversation_key,
+                    tenant_id=tenant_ref,
+                    booking_reference=decision_booking_ref,
+                    identity_metadata=identity_metadata,
+                    locale=locale,
+                    customer_phone=customer_phone,
+                    customer_email=customer_email,
+                    existing_state=channel_state,
+                    cancel_reason=message.text,
+                )
+            if decision == "no":
+                await self._clear_cancel_intent_pending(
+                    session,
+                    channel=normalized_channel,
+                    conversation_id=conversation_key,
+                    tenant_id=tenant_ref,
+                    customer_identity=identity_metadata,
+                    existing_state=channel_state,
+                )
+                return MessagingAutomationResult(
+                    ai_reply=self._localized("cancel_kept", locale),
+                    ai_intent="cancel_kept",
+                    workflow_status="answered",
+                    metadata={
+                        "messaging_layer": self._layer_metadata(normalized_channel),
+                        "customer_identity": identity_metadata,
+                        "customer_care_status": "cancel_kept",
+                        "booking_reference": decision_booking_ref,
+                        "locale": locale,
+                    },
+                )
+
         history = await self._load_conversation_history(
             session,
             channel=normalized_channel,
@@ -812,13 +858,17 @@ class MessagingAutomationService:
                 for action in care_turn.get("next_actions", [])
             )
             if cancel_action_enabled:
-                await self._clear_cancel_intent_pending(
+                # Keep the cancel intent pending and stash the booking
+                # reference so a bare YES/NO reply on the next turn can
+                # resolve to this booking.
+                await self._mark_cancel_intent_pending(
                     session,
                     channel=normalized_channel,
                     conversation_id=conversation_key,
                     tenant_id=tenant_ref,
                     customer_identity=identity_metadata,
                     existing_state=channel_state,
+                    booking_reference=booking_reference,
                 )
                 return self._build_cancel_confirm_result(
                     channel=normalized_channel,
@@ -891,7 +941,12 @@ class MessagingAutomationService:
                 parse_mode=parse_mode,
             )
         elif normalized_channel == "whatsapp":
-            result = await communication_service.send_whatsapp(to=recipient, body=body)
+            result = await communication_service.send_whatsapp(
+                to=recipient,
+                body=body,
+                reply_markup=reply_markup,
+                parse_mode=parse_mode,
+            )
         else:
             return {
                 "provider": normalized_channel,
@@ -1712,9 +1767,7 @@ class MessagingAutomationService:
         )
         lines = [
             f"<b>{MessagingAutomationService._html(heading)}</b>",
-            f"<b>Search</b>: {MessagingAutomationService._html(MessagingAutomationService._truncate_text(query, limit=90))}",
-            f"<b>Website</b>: <a href=\"{BOOKEDAI_PUBLIC_URL}\">bookedai.au</a>",
-            "<b>Status</b>: compare options first, then book when ready.",
+            f"<b>Search</b>: {MessagingAutomationService._html(MessagingAutomationService._truncate_text(query, limit=64))}",
             "",
         ]
         for option in options:
@@ -1736,17 +1789,15 @@ class MessagingAutomationService:
                 lines.append(MessagingAutomationService._html(" | ".join(detail_bits)))
             if summary:
                 lines.append(MessagingAutomationService._html(summary))
-            lines.append(
-                f"<b>Next</b>: tap <b>Book {MessagingAutomationService._html(option_index)}</b>, then send name, email/phone, and preferred time."
-            )
+            lines.append(f"<b>Book {MessagingAutomationService._html(option_index)}</b>: send name + email/phone + time.")
             lines.append("")
         lines.extend(
             [
-                "<b>Actions</b>: use the buttons below to view details, book an option, or open the full BookedAI form.",
+                "<b>Choose below</b>: View, Book, or open the full BookedAI form.",
                 (
-                    "For a wider search, tap <b>Find more on Internet near me</b> or send your suburb."
+                    "Need different options? Tap <b>Search more</b>."
                     if not public_web_requested
-                    else "Internet results are sourced options. Confirm final details before booking."
+                    else f"More info: <a href=\"{BOOKEDAI_PUBLIC_URL}\">bookedai.au</a>"
                 ),
             ]
         )
@@ -1948,20 +1999,13 @@ class MessagingAutomationService:
         qr_url = MessagingAutomationService._portal_qr_url(booking_reference)
         return "\n".join(
             [
-                f"<b>{BOOKEDAI_CUSTOMER_PROJECT_NAME}: current order found</b>",
-                f"<b>Current order</b>: <code>{MessagingAutomationService._html(booking_reference)}</code>",
-                "<b>Status</b>: active booking context is still open.",
+                "<b>Current booking</b>",
+                f"<code>{MessagingAutomationService._html(booking_reference)}</code>",
                 f"<b>Portal</b>: <a href=\"{MessagingAutomationService._html(portal_url)}\">open order</a>",
                 f"<b>QR</b>: <a href=\"{MessagingAutomationService._html(qr_url)}\">open QR code</a>",
                 "",
-                f"<b>You asked to search</b>: {MessagingAutomationService._html(MessagingAutomationService._truncate_text(query, limit=90))}",
-                "Before I move into new options, please choose what should happen with the current booking.",
-                "",
-                "<b>Actions</b>",
-                "Keep this booking and search BookedAI.au",
-                "Find Internet options for another booking service",
-                "Request a change to the current booking",
-                "Return to the current order portal anytime",
+                f"<b>New search</b>: {MessagingAutomationService._html(MessagingAutomationService._truncate_text(query, limit=64))}",
+                "BookedAI.au: choose what should happen with the current booking.",
             ]
         )
 
@@ -2247,19 +2291,16 @@ class MessagingAutomationService:
             access_token=portal_access_token,
         )
         payment_line = (
-            "Payment status: pending. Your booking request is kept in BookedAI while provider "
-            "confirmation and payment instructions are prepared."
+            "Payment pending. We will send the next step here."
         )
         reply = (
-            f"<b>{BOOKEDAI_CUSTOMER_PROJECT_NAME}: booking request started</b>\n"
+            "<b>Booking started</b>\n"
             f"<b>Service</b>: {self._html(service_name)}\n"
-            f"<b>Reference</b>: <code>{self._html(booking_reference)}</code> (tap to copy)\n"
-            "<b>Status</b>: booking captured, payment pending\n"
+            f"<b>Ref</b>: <code>{self._html(booking_reference)}</code> (tap to copy)\n"
+            "<b>Status</b>: pending\n"
             f"<b>Portal</b>: <a href=\"{self._html(portal_url)}\">open order</a>\n"
-            f"<b>QR</b>: <a href=\"{self._html(qr_code_url)}\">open QR code</a>\n"
-            f"<b>Website</b>: <a href=\"{BOOKEDAI_PUBLIC_URL}\">bookedai.au</a>\n\n"
-            f"{self._html(payment_line)}\n"
-            "<b>Next</b>: use the buttons below to review, pay when available, ask for a change, cancel for review, or start a new search."
+            f"{self._html(payment_line)}\n\n"
+            "<b>Choose below</b>: view, change, cancel, or search new."
         )
         return MessagingAutomationResult(
             ai_reply=reply,
@@ -2338,11 +2379,11 @@ class MessagingAutomationService:
             else "You can keep replying here."
         )
         return (
-            f"{greeting} I can help you start a new booking with BookedAI. "
-            "Please reply with the service you want, preferred day/time, suburb or online preference, "
-            "and your name/email if you want a confirmation sent. "
-            "If you already booked, send the booking reference and I can check status, payment, "
-            f"reschedule, or cancellation options. {channel_hint} You can also continue at https://bookedai.au."
+            f"{greeting} I can help you start a new booking.\n"
+            "What would you like to book?\n"
+            "Send service + suburb/online + preferred time.\n"
+            "Already booked? Send your booking ref.\n"
+            f"{channel_hint}"
         )
 
     async def _build_welcome_result(
@@ -2810,44 +2851,122 @@ class MessagingAutomationService:
         locale: str,
         customer_phone: str | None,
         customer_email: str | None,
+        tenant_id: str | None = None,
+        new_slot_id: str | None = None,
+        new_timezone: str = "Australia/Sydney",
     ) -> MessagingAutomationResult:
-        queued_request = await queue_portal_booking_request(
-            session,
-            booking_reference=booking_reference,
-            request_type="reschedule_request",
-            customer_note=(
-                f"Customer requested reschedule via inline picker: {selected_date} {selected_time}"
-            ),
-            preferred_date=selected_date,
-            preferred_time=selected_time,
-            timezone="Australia/Sydney",
+        # Combine selected_date + selected_time into a timezone-aware datetime.
+        new_start_at = self._combine_picker_datetime(
+            selected_date, selected_time, timezone_name=new_timezone
         )
-        body = self._localized(
-            "reschedule_confirmed",
-            locale,
-            booking_reference=booking_reference,
-            selected_date=selected_date,
-            selected_time=selected_time,
+        actor_id = (
+            customer_phone
+            or customer_email
+            or str(identity_metadata.get("chat_id") or "").strip()
+            or None
         )
-        if not queued_request:
+        orchestrator_status: str | None = None
+        orchestrator_result: dict[str, object] | None = None
+        queued_request: dict[str, object] | None = None
+
+        if new_start_at is not None and tenant_id:
+            try:
+                orchestrator_result = await orchestrate_booking_rescheduled(
+                    session,
+                    tenant_id=tenant_id,
+                    booking_reference=booking_reference,
+                    new_start_at=new_start_at,
+                    actor_type="customer_message",
+                    channel=channel,
+                    new_slot_id=new_slot_id,
+                    new_timezone=new_timezone,
+                    actor_id=actor_id,
+                )
+                orchestrator_status = str(orchestrator_result.get("status") or "").strip().lower()
+            except Exception:  # pragma: no cover - defensive
+                _logger.exception("orchestrate_booking_rescheduled_failed")
+                orchestrator_status = "failed"
+
+        if orchestrator_status == "rescheduled":
             body = self._localized(
-                "reschedule_could_not_queue",
+                "reschedule_confirmed",
+                locale,
+                booking_reference=booking_reference,
+                selected_date=selected_date,
+                selected_time=selected_time,
+            )
+            ai_intent = "reschedule_confirmed"
+            care_status = "reschedule_confirmed"
+        elif orchestrator_status == "not_reschedulable":
+            body = self._localized(
+                "reschedule_failed_state",
                 locale,
                 booking_reference=booking_reference,
             )
+            ai_intent = "reschedule_failed"
+            care_status = "reschedule_failed_state"
+        elif orchestrator_status == "not_found":
+            body = self._localized(
+                "reschedule_failed_not_found",
+                locale,
+                booking_reference=booking_reference,
+            )
+            ai_intent = "reschedule_failed"
+            care_status = "reschedule_failed_not_found"
+        else:
+            # Fallback: keep legacy queue so a human can still handle it.
+            queued_request = await queue_portal_booking_request(
+                session,
+                booking_reference=booking_reference,
+                request_type="reschedule_request",
+                customer_note=(
+                    f"Customer requested reschedule via inline picker: {selected_date} {selected_time}"
+                ),
+                preferred_date=selected_date,
+                preferred_time=selected_time,
+                timezone=new_timezone,
+            )
+            if queued_request:
+                body = self._localized(
+                    "reschedule_confirmed",
+                    locale,
+                    booking_reference=booking_reference,
+                    selected_date=selected_date,
+                    selected_time=selected_time,
+                )
+                ai_intent = "reschedule_confirmed"
+                care_status = "reschedule_confirmed"
+            else:
+                body = self._localized(
+                    "reschedule_failed_generic",
+                    locale,
+                    booking_reference=booking_reference,
+                )
+                ai_intent = "reschedule_failed"
+                care_status = "reschedule_failed_generic"
+
+        # Always clear any reschedule intent metadata on the session.
+        await self._clear_reschedule_intent_pending(
+            session,
+            channel=channel,
+            conversation_id=str(identity_metadata.get("conversation_id") or "").strip() or None,
+            tenant_id=tenant_id,
+            customer_identity=identity_metadata,
+        )
+
         return MessagingAutomationResult(
             ai_reply=body,
-            ai_intent="reschedule_confirmed" if queued_request else "reschedule_failed",
+            ai_intent=ai_intent,
             workflow_status="answered",
             metadata={
                 "messaging_layer": self._layer_metadata(channel),
                 "customer_identity": identity_metadata,
-                "customer_care_status": (
-                    "reschedule_confirmed" if queued_request else "reschedule_failed"
-                ),
+                "customer_care_status": care_status,
                 "booking_reference": booking_reference,
                 "selected_date": selected_date,
                 "selected_time": selected_time,
+                "orchestrator_status": orchestrator_status,
+                "orchestrator_result": orchestrator_result,
                 "queued_request": queued_request,
                 "locale": locale,
                 "reply_controls": {
@@ -2866,6 +2985,186 @@ class MessagingAutomationService:
                     "telegram_parse_mode": "HTML",
                 },
             },
+        )
+
+    @staticmethod
+    def _combine_picker_datetime(
+        selected_date: str,
+        selected_time: str,
+        *,
+        timezone_name: str = "Australia/Sydney",
+    ) -> datetime | None:
+        try:
+            from zoneinfo import ZoneInfo
+
+            tz = ZoneInfo(timezone_name)
+        except Exception:  # pragma: no cover - fallback to UTC if zoneinfo missing
+            tz = UTC
+        raw = f"{str(selected_date or '').strip()} {str(selected_time or '').strip()}"
+        for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S"):
+            try:
+                naive = datetime.strptime(raw, fmt)
+                return naive.replace(tzinfo=tz)
+            except ValueError:
+                continue
+        return None
+
+    _CANCEL_YES_TOKENS = frozenset(
+        {"yes", "y", "co", "đồng ý", "dong y"}
+    )
+    _CANCEL_NO_TOKENS = frozenset(
+        {"no", "n", "không", "khong", "huỷ", "huy"}
+    )
+
+    @classmethod
+    def _parse_cancel_confirm_callback(
+        cls,
+        text: str,
+        *,
+        session_metadata: dict[str, object] | None = None,
+    ) -> tuple[str, str] | None:
+        """Detect a YES/NO answer to a cancel-confirm prompt.
+
+        Returns (decision, booking_reference) or None. ``decision`` is one of
+        ``'yes'`` / ``'no'``. The booking reference is parsed from the inline
+        callback text (``Cancel current booking <ref>`` / ``Keep current
+        booking <ref>``) or, when the user typed a bare YES/NO token, from
+        ``session_metadata['cancel_intent_booking_reference']``.
+        """
+        raw = str(text or "").strip()
+        if not raw:
+            return None
+        lowered = raw.lower()
+        # Inline-keyboard callback shapes from _build_cancel_confirm_result.
+        if lowered.startswith("cancel current booking"):
+            ref = raw[len("cancel current booking"):].strip()
+            if ref:
+                return ("yes", ref)
+        if lowered.startswith("keep current booking") and not lowered.startswith(
+            "keep current booking, search bookedai.au"
+        ) and "and search bookedai.au" not in lowered and "find another booking option" not in lowered:
+            ref = raw[len("keep current booking"):].strip()
+            if ref:
+                return ("no", ref)
+        # Bare YES / NO requires a pending cancel intent recorded in metadata.
+        normalized = unicodedata.normalize("NFKC", lowered).strip()
+        meta = session_metadata if isinstance(session_metadata, dict) else {}
+        if not meta.get("cancel_intent_pending"):
+            return None
+        pending_ref = str(meta.get("cancel_intent_booking_reference") or "").strip()
+        if not pending_ref:
+            return None
+        if normalized in cls._CANCEL_YES_TOKENS:
+            return ("yes", pending_ref)
+        if normalized in cls._CANCEL_NO_TOKENS:
+            return ("no", pending_ref)
+        return None
+
+    async def _handle_cancel_confirm(
+        self,
+        session,
+        *,
+        channel: str,
+        conversation_id: str | None,
+        tenant_id: str | None,
+        booking_reference: str,
+        identity_metadata: dict[str, object],
+        locale: str,
+        customer_phone: str | None,
+        customer_email: str | None,
+        existing_state: dict[str, object] | None,
+        cancel_reason: str | None,
+    ) -> MessagingAutomationResult:
+        actor_id = (
+            customer_phone
+            or customer_email
+            or str(identity_metadata.get("chat_id") or "").strip()
+            or None
+        )
+        orchestrator_status: str | None = None
+        orchestrator_result: dict[str, object] | None = None
+        queued_request: dict[str, object] | None = None
+
+        if tenant_id and booking_reference:
+            try:
+                orchestrator_result = await orchestrate_booking_cancelled(
+                    session,
+                    tenant_id=tenant_id,
+                    booking_reference=booking_reference,
+                    actor_type="customer_message",
+                    channel=channel,
+                    actor_id=actor_id,
+                    reason=cancel_reason,
+                )
+                orchestrator_status = str(orchestrator_result.get("status") or "").strip().lower()
+            except Exception:  # pragma: no cover - defensive
+                _logger.exception("orchestrate_booking_cancelled_failed")
+                orchestrator_status = "failed"
+
+        if orchestrator_status in {"cancelled", "already_cancelled"}:
+            ai_intent = "cancel_confirmation"
+            care_status = "cancel_confirmation"
+            success_result = self._build_cancel_confirm_result(
+                channel=channel,
+                booking_reference=booking_reference,
+                identity_metadata=identity_metadata,
+                booking_resolution=None,
+                locale=locale,
+            )
+            body = success_result.ai_reply
+            reply_controls = success_result.metadata.get("reply_controls") if success_result.metadata else None
+        elif orchestrator_status == "not_found":
+            body = self._localized(
+                "cancel_failed_not_found", locale, booking_reference=booking_reference
+            )
+            ai_intent = "cancel_failed"
+            care_status = "cancel_failed_not_found"
+            reply_controls = None
+        else:
+            # Fallback queue so a human can still handle.
+            queued_request = await queue_portal_booking_request(
+                session,
+                booking_reference=booking_reference,
+                request_type="cancel_request",
+                customer_note=cancel_reason,
+                preferred_date=None,
+                preferred_time=None,
+                timezone=None,
+            )
+            body = self._localized(
+                "cancel_failed_generic", locale, booking_reference=booking_reference
+            )
+            ai_intent = "cancel_failed"
+            care_status = "cancel_failed_generic"
+            reply_controls = None
+
+        # Always clear cancel intent metadata after a confirm decision.
+        await self._clear_cancel_intent_pending(
+            session,
+            channel=channel,
+            conversation_id=conversation_id,
+            tenant_id=tenant_id,
+            customer_identity=identity_metadata,
+            existing_state=existing_state,
+        )
+
+        metadata: dict[str, object] = {
+            "messaging_layer": self._layer_metadata(channel),
+            "customer_identity": identity_metadata,
+            "customer_care_status": care_status,
+            "booking_reference": booking_reference,
+            "orchestrator_status": orchestrator_status,
+            "orchestrator_result": orchestrator_result,
+            "queued_request": queued_request,
+            "locale": locale,
+        }
+        if reply_controls:
+            metadata["reply_controls"] = reply_controls
+        return MessagingAutomationResult(
+            ai_reply=body,
+            ai_intent=ai_intent,
+            workflow_status="answered",
+            metadata=metadata,
         )
 
     @staticmethod
@@ -2897,6 +3196,7 @@ class MessagingAutomationService:
         tenant_id: str | None,
         customer_identity: dict[str, object],
         existing_state: dict[str, object] | None = None,
+        booking_reference: str | None = None,
     ) -> None:
         if not conversation_id:
             return
@@ -2908,6 +3208,8 @@ class MessagingAutomationService:
             "cancel_intent_pending": True,
             "cancel_intent_recorded_at": datetime.now(UTC).isoformat(),
         }
+        if booking_reference:
+            merged_metadata["cancel_intent_booking_reference"] = booking_reference
         await self._upsert_channel_session_state(
             session,
             channel=channel,
@@ -2944,7 +3246,12 @@ class MessagingAutomationService:
         cleared = {
             key: value
             for key, value in existing_metadata.items()
-            if key not in {"cancel_intent_pending", "cancel_intent_recorded_at"}
+            if key
+            not in {
+                "cancel_intent_pending",
+                "cancel_intent_recorded_at",
+                "cancel_intent_booking_reference",
+            }
         }
         await self._upsert_channel_session_state(
             session,
@@ -2960,6 +3267,90 @@ class MessagingAutomationService:
             ],
             reply_controls=(existing_state or {}).get("reply_controls") or {},
             last_ai_intent="cancel_intent_cleared",
+            last_workflow_status="answered",
+            metadata=cleared,
+        )
+
+    async def _mark_reschedule_intent_pending(
+        self,
+        session,
+        *,
+        channel: str,
+        conversation_id: str | None,
+        tenant_id: str | None,
+        customer_identity: dict[str, object],
+        booking_reference: str | None = None,
+        existing_state: dict[str, object] | None = None,
+    ) -> None:
+        if not conversation_id:
+            return
+        existing_metadata = (existing_state or {}).get("session_metadata") if existing_state else {}
+        if not isinstance(existing_metadata, dict):
+            existing_metadata = {}
+        merged_metadata = {
+            **existing_metadata,
+            "reschedule_intent_pending": True,
+            "reschedule_intent_recorded_at": datetime.now(UTC).isoformat(),
+        }
+        if booking_reference:
+            merged_metadata["reschedule_intent_booking_reference"] = booking_reference
+        await self._upsert_channel_session_state(
+            session,
+            channel=channel,
+            conversation_id=conversation_id,
+            tenant_id=tenant_id,
+            customer_identity=customer_identity,
+            service_search_query=(existing_state or {}).get("service_search_query"),
+            service_options=[
+                item
+                for item in ((existing_state or {}).get("service_options") or [])
+                if isinstance(item, dict)
+            ],
+            reply_controls=(existing_state or {}).get("reply_controls") or {},
+            last_ai_intent="reschedule_intent_pending",
+            last_workflow_status="answered",
+            metadata=merged_metadata,
+        )
+
+    async def _clear_reschedule_intent_pending(
+        self,
+        session,
+        *,
+        channel: str,
+        conversation_id: str | None,
+        tenant_id: str | None,
+        customer_identity: dict[str, object],
+        existing_state: dict[str, object] | None = None,
+    ) -> None:
+        if not conversation_id:
+            return
+        existing_metadata = (existing_state or {}).get("session_metadata") if existing_state else {}
+        if not isinstance(existing_metadata, dict) or not existing_metadata.get("reschedule_intent_pending"):
+            return
+        cleared = {
+            key: value
+            for key, value in existing_metadata.items()
+            if key
+            not in {
+                "reschedule_intent_pending",
+                "reschedule_intent_recorded_at",
+                "reschedule_intent_booking_reference",
+            }
+        }
+        await self._upsert_channel_session_state(
+            session,
+            channel=channel,
+            conversation_id=conversation_id,
+            tenant_id=tenant_id,
+            customer_identity=customer_identity,
+            service_search_query=(existing_state or {}).get("service_search_query"),
+            service_options=[
+                item
+                for item in ((existing_state or {}).get("service_options") or [])
+                if isinstance(item, dict)
+            ],
+            reply_controls=(existing_state or {}).get("reply_controls") or {},
+            last_ai_intent="reschedule_intent_cleared",
             last_workflow_status="answered",
             metadata=cleared,
         )
@@ -3068,36 +3459,25 @@ class MessagingAutomationService:
     LOCALIZED_COPY: dict[str, dict[str, str]] = {
         "welcome": {
             "en": (
-                "{greeting} I'm <b>BookedAI Manager Bot</b>. "
-                "I can find and book services for you across Australia and online.\n\n"
-                "Try one of these:\n"
-                "• Tap <b>Find a service</b> below\n"
-                "• Or type what you want, e.g. <i>Find a chess class in Sydney this weekend</i>\n"
-                "• Send /mybookings to see your active bookings\n"
-                "• Send /help anytime to see what I can do"
+                "{greeting} I'm <b>BookedAI Manager Bot</b>.\n"
+                "What do you want to book?\n\n"
+                "Tap <b>Find a service</b>.\n"
+                "Or type what you want."
             ),
             "vi": (
-                "{greeting} Mình là <b>BookedAI Manager Bot</b>. "
-                "Mình giúp bạn tìm và đặt dịch vụ ở Úc và online.\n\n"
-                "Bạn có thể:\n"
-                "• Bấm <b>Tìm dịch vụ</b> bên dưới\n"
-                "• Hoặc gõ điều bạn muốn, ví dụ <i>Tìm lớp cờ vua ở Sydney cuối tuần này</i>\n"
-                "• Gõ /mybookings để xem các booking đang có\n"
-                "• Gõ /help bất cứ lúc nào để xem mình hỗ trợ được gì"
+                "{greeting} Mình là <b>BookedAI Manager Bot</b>.\n"
+                "Bạn muốn đặt gì?\n\n"
+                "Bấm <b>Tìm dịch vụ</b> hoặc nhắn trực tiếp ở đây."
             ),
         },
         "welcome_copy_concise": {
             "en": (
                 "{greeting} I'm <b>BookedAI Manager Bot</b>.\n"
-                "Tap <b>Find a service</b> below, or tell me what you want — "
-                "for example, <i>chess class in Sydney this weekend</i>.\n"
-                "Send /mybookings to see active bookings or /help for more."
+                "Tap <b>Find a service</b> or tell me what you want to book."
             ),
             "vi": (
                 "{greeting} Mình là <b>BookedAI Manager Bot</b>.\n"
-                "Bấm <b>Tìm dịch vụ</b> bên dưới, hoặc gõ điều bạn muốn — "
-                "ví dụ <i>lớp cờ vua ở Sydney cuối tuần này</i>.\n"
-                "Gõ /mybookings để xem booking hiện có hoặc /help để biết thêm."
+                "Bấm <b>Tìm dịch vụ</b> hoặc nhắn bạn muốn đặt gì."
             ),
         },
         "welcome_greeting_named": {
@@ -3110,170 +3490,171 @@ class MessagingAutomationService:
         },
         "search_prompt": {
             "en": (
-                "What would you like to find? Reply with the service plus location and time, for example:\n"
-                "• <i>Find a chess class in Sydney this weekend</i>\n"
-                "• <i>Massage in Surry Hills tomorrow afternoon</i>\n"
-                "• <i>AI Mentor 1-1 session next week</i>"
+                "What would you like to find?\n"
+                "Example: <i>chess class in Sydney this weekend</i>"
             ),
             "vi": (
-                "Bạn muốn tìm gì? Trả lời theo dạng dịch vụ + địa điểm + thời gian, ví dụ:\n"
-                "• <i>Tìm lớp cờ vua ở Sydney cuối tuần này</i>\n"
-                "• <i>Massage ở Surry Hills chiều mai</i>\n"
-                "• <i>AI Mentor 1-1 tuần sau</i>"
+                "Bạn muốn tìm gì?\n"
+                "Ví dụ: <i>lớp cờ vua ở Sydney cuối tuần này</i>"
             ),
         },
         "mybookings_prompt": {
             "en": (
-                "To pull up your booking I need one of:\n"
-                "• your booking reference (looks like <code>v1-xxxxxx</code>)\n"
-                "• the email used to book\n"
-                "• the phone number used to book\n\n"
-                "Reply with one of those and I'll show the booking and the actions available."
+                "Send your booking reference or email/phone.\n"
+                "Example: <code>v1-xxxxxx</code>"
             ),
             "vi": (
-                "Để mở booking của bạn, mình cần một trong các thông tin sau:\n"
-                "• mã booking (dạng <code>v1-xxxxxx</code>)\n"
-                "• email đã dùng khi đặt\n"
-                "• số điện thoại đã dùng khi đặt\n\n"
-                "Bạn gửi mình một trong các thông tin trên là mình mở được booking và các thao tác đi kèm."
+                "Gửi mã booking hoặc email/số điện thoại.\n"
+                "Ví dụ: <code>v1-xxxxxx</code>"
             ),
         },
         "cancel_prompt": {
             "en": (
-                "I can request a cancellation for you. Please reply with the booking reference "
-                "(<code>v1-xxxxxx</code>) or the email/phone used to book, and I'll route the cancel "
-                "request to the provider. If the booking is already paid, refund handling is provider-led."
+                "Send the booking reference for cancellation.\n"
+                "Example: <code>v1-xxxxxx</code>"
             ),
             "vi": (
-                "Mình có thể gửi yêu cầu hủy giúp bạn. Bạn gửi mình mã booking "
-                "(<code>v1-xxxxxx</code>) hoặc email/số điện thoại đã đặt, mình sẽ chuyển yêu cầu hủy "
-                "cho nhà cung cấp. Nếu đã thanh toán, việc hoàn tiền do nhà cung cấp xử lý."
+                "Gửi mã booking để hủy.\n"
+                "Ví dụ: <code>v1-xxxxxx</code>"
             ),
         },
         "support_handoff": {
             "en": (
-                "I've flagged this conversation for a BookedAI human teammate. "
-                "Someone will jump in here within business hours.\n\n"
-                "If it's urgent, email <b>{support_email}</b> with your booking reference and the "
-                "question. Meanwhile I'll keep listening here."
+                "I've flagged this conversation for support.\n"
+                "A BookedAI teammate will reply here.\n"
+                "Urgent: <b>{support_email}</b>"
             ),
             "vi": (
-                "Mình đã chuyển hội thoại này tới đội hỗ trợ BookedAI. "
-                "Có người sẽ vào trả lời bạn trong giờ làm việc.\n\n"
-                "Nếu gấp, bạn email <b>{support_email}</b> kèm mã booking và câu hỏi. "
-                "Trong lúc đó mình vẫn theo dõi tin nhắn ở đây."
+                "Đã gọi hỗ trợ.\n"
+                "Đội BookedAI sẽ trả lời tại đây.\n"
+                "Gấp: <b>{support_email}</b>"
             ),
         },
         "support_handoff_failed": {
             "en": (
-                "I tried to ping the BookedAI team channel but couldn't reach it just now.\n\n"
-                "Please email <b>{support_email}</b> with your booking reference and the question — "
-                "the team will reply from there. I'll keep listening here in case you want to send "
-                "more details."
+                "I couldn't reach support just now.\n"
+                "Email <b>{support_email}</b> with your booking ref."
             ),
             "vi": (
-                "Mình đã cố thông báo cho đội BookedAI nhưng kênh nội bộ tạm thời không phản hồi.\n\n"
-                "Bạn email cho <b>{support_email}</b> kèm mã booking và câu hỏi — đội sẽ trả lời "
-                "qua email. Mình vẫn theo dõi ở đây nếu bạn muốn gửi thêm thông tin."
+                "Kênh hỗ trợ đang tạm lỗi.\n"
+                "Email <b>{support_email}</b> kèm mã booking."
             ),
         },
         "support_handoff_recent": {
             "en": (
-                "I've already pinged the BookedAI team for this conversation a moment ago. "
-                "They'll jump in shortly.\n\n"
-                "If it's urgent, email <b>{support_email}</b> with your booking reference."
+                "I've already pinged support.\n"
+                "Urgent: <b>{support_email}</b>"
             ),
             "vi": (
-                "Mình vừa gửi thông báo cho đội BookedAI về cuộc trò chuyện này. "
-                "Họ sẽ vào trả lời sớm.\n\n"
-                "Nếu gấp, bạn email <b>{support_email}</b> kèm mã booking."
+                "Đội hỗ trợ đã được báo.\n"
+                "Gấp: <b>{support_email}</b>"
             ),
         },
         "handoff_claimed_active": {
             "en": (
-                "A BookedAI teammate is reading this thread now and will reply directly. "
-                "I'm stepping back so we don't double-up. Go ahead and chat with them here."
+                "A BookedAI teammate is here now.\n"
+                "Please chat with them directly."
             ),
             "vi": (
-                "Đội BookedAI đang theo dõi cuộc trò chuyện này và sẽ trả lời trực tiếp. "
-                "Mình tạm dừng để tránh trả lời chồng chéo. Bạn cứ trao đổi với đội ở đây nhé."
+                "Đội BookedAI đang ở đây.\n"
+                "Bạn trao đổi trực tiếp tại đây nhé."
             ),
         },
         "keyboard_find_service": {"en": "Find a service", "vi": "Tìm dịch vụ"},
         "keyboard_my_bookings": {"en": "My bookings", "vi": "Booking của tôi"},
         "keyboard_talk_support": {"en": "Talk to support", "vi": "Gặp hỗ trợ"},
         "keyboard_placeholder": {
-            "en": "Tell me what you want to book…",
-            "vi": "Bạn muốn đặt gì? Gõ vào đây…",
+            "en": "Type service, booking ref, or question...",
+            "vi": "Gõ dịch vụ, mã booking, hoặc câu hỏi...",
         },
         "cancel_confirm_prompt": {
             "en": (
-                "Confirm cancellation of booking <code>{booking_reference}</code>?\n\n"
-                "Tap <b>Confirm cancel</b> to send the cancel request to the provider, or "
-                "<b>Keep booking</b> to leave it untouched."
+                "Confirm cancel of <code>{booking_reference}</code>? "
+                "Reply YES to confirm or NO to keep your booking."
             ),
             "vi": (
-                "Xác nhận hủy booking <code>{booking_reference}</code>?\n\n"
-                "Bấm <b>Xác nhận hủy</b> để gửi yêu cầu hủy cho nhà cung cấp, hoặc "
-                "<b>Giữ booking</b> để giữ nguyên."
+                "Bạn xác nhận huỷ <code>{booking_reference}</code>? "
+                "Trả lời YES để huỷ hoặc NO để giữ buổi học."
             ),
         },
-        "cancel_confirm_yes": {"en": "✅ Confirm cancel", "vi": "✅ Xác nhận hủy"},
-        "cancel_confirm_no": {"en": "↩ Keep booking", "vi": "↩ Giữ booking"},
-        "talk_to_support": {"en": "👤 Talk to support", "vi": "👤 Gặp hỗ trợ"},
+        "cancel_confirm_yes": {"en": "Confirm cancel", "vi": "Xác nhận hủy"},
+        "cancel_confirm_no": {"en": "Keep booking", "vi": "Giữ booking"},
+        "talk_to_support": {"en": "Support", "vi": "Hỗ trợ"},
         "reschedule_date_prompt": {
             "en": (
-                "Pick a new date for booking <code>{booking_reference}</code>:\n\n"
-                "Tap a date below. After picking, you'll choose a time slot. "
-                "The provider will confirm the new slot."
+                "Pick a new date.\n"
+                "Booking: <code>{booking_reference}</code>"
             ),
             "vi": (
-                "Chọn ngày mới cho booking <code>{booking_reference}</code>:\n\n"
-                "Bấm vào một ngày bên dưới. Sau khi chọn ngày, bạn sẽ chọn giờ. "
-                "Nhà cung cấp sẽ xác nhận lại lịch mới."
+                "Chọn ngày mới.\n"
+                "Booking: <code>{booking_reference}</code>"
             ),
         },
         "reschedule_time_prompt": {
             "en": (
-                "New date: <b>{selected_date}</b> for booking <code>{booking_reference}</code>.\n\n"
-                "Pick a time slot below."
+                "Pick a time.\n"
+                "<b>{selected_date}</b> | <code>{booking_reference}</code>"
             ),
             "vi": (
-                "Ngày mới: <b>{selected_date}</b> cho booking <code>{booking_reference}</code>.\n\n"
-                "Bấm chọn khung giờ bên dưới."
+                "Chọn giờ.\n"
+                "<b>{selected_date}</b> | <code>{booking_reference}</code>"
             ),
         },
         "reschedule_confirmed": {
             "en": (
-                "Reschedule request sent.\n"
-                "Booking: <code>{booking_reference}</code>\n"
-                "New slot: <b>{selected_date} {selected_time}</b>\n\n"
-                "The provider will confirm. We'll keep you posted here."
+                "Change request sent.\n"
+                "<code>{booking_reference}</code> | <b>{selected_date} {selected_time}</b>"
             ),
             "vi": (
                 "Đã gửi yêu cầu đổi lịch.\n"
-                "Booking: <code>{booking_reference}</code>\n"
-                "Lịch mới: <b>{selected_date} {selected_time}</b>\n\n"
-                "Nhà cung cấp sẽ xác nhận. Mình sẽ cập nhật lại ở đây."
+                "<code>{booking_reference}</code> | <b>{selected_date} {selected_time}</b>"
             ),
         },
         "reschedule_could_not_queue": {
             "en": (
-                "I couldn't queue the reschedule request for <code>{booking_reference}</code> "
-                "right now. Please try again or tap Talk to support."
+                "Could not send change request for <code>{booking_reference}</code>.\n"
+                "Try again or tap Support."
             ),
             "vi": (
-                "Mình không gửi được yêu cầu đổi lịch cho <code>{booking_reference}</code> "
-                "lúc này. Bạn thử lại hoặc bấm Gặp hỗ trợ."
+                "Chưa gửi được yêu cầu đổi lịch cho <code>{booking_reference}</code>.\n"
+                "Thử lại hoặc bấm Hỗ trợ."
             ),
         },
         "reschedule_back_to_booking": {
-            "en": "↩ Back to booking",
-            "vi": "↩ Về booking",
+            "en": "Back",
+            "vi": "Quay lại",
         },
         "reschedule_back_to_dates": {
-            "en": "↩ Pick a different date",
-            "vi": "↩ Chọn ngày khác",
+            "en": "Change date",
+            "vi": "Đổi ngày",
+        },
+        "cancel_kept": {
+            "en": "Got it — your booking is unchanged.",
+            "vi": "OK, giữ nguyên buổi học của bạn.",
+        },
+        "cancel_failed_not_found": {
+            "en": "We couldn't find that booking. Please contact support.",
+            "vi": "Không tìm thấy booking. Vui lòng liên hệ hỗ trợ.",
+        },
+        "cancel_failed_generic": {
+            "en": "Something went wrong cancelling. Our team will follow up shortly.",
+            "vi": "Có lỗi khi huỷ. Đội ngũ sẽ liên hệ với bạn sớm.",
+        },
+        "reschedule_confirm_prompt": {
+            "en": "Confirm new time {new_slot_label}? YES to confirm or NO to keep.",
+            "vi": "Xác nhận giờ mới {new_slot_label}? YES để xác nhận hoặc NO để giữ.",
+        },
+        "reschedule_failed_state": {
+            "en": "This booking can no longer be rescheduled.",
+            "vi": "Booking này không thể đổi lịch nữa.",
+        },
+        "reschedule_failed_not_found": {
+            "en": "We couldn't find that booking. Please contact support.",
+            "vi": "Không tìm thấy booking. Vui lòng liên hệ hỗ trợ.",
+        },
+        "reschedule_failed_generic": {
+            "en": "Something went wrong rescheduling. Our team will follow up shortly.",
+            "vi": "Có lỗi khi đổi lịch. Đội ngũ sẽ liên hệ với bạn sớm.",
         },
     }
 
@@ -3322,15 +3703,24 @@ class MessagingAutomationService:
         if not text:
             return None
         mapping = {
+            "book / search": "search",
+            "book": "search",
+            "search": "search",
             "find a service": "search",
             "find service": "search",
+            "my booking": "mybookings",
             "my bookings": "mybookings",
             "mybookings": "mybookings",
             "talk to support": "support",
             "support": "support",
             # Vietnamese keyboard labels (and tolerated variants)
+            "đặt / tìm": "search",
+            "dat / tim": "search",
+            "đặt": "search",
+            "dat": "search",
             "tìm dịch vụ": "search",
             "tim dich vu": "search",
+            "booking": "mybookings",
             "booking của tôi": "mybookings",
             "booking cua toi": "mybookings",
             "gặp hỗ trợ": "support",

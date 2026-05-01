@@ -43,10 +43,12 @@ class ChessScheduleSlotRepository(BaseRepository):
         starts_to: datetime,
         limit: int = 12,
     ) -> list[dict[str, Any]]:
-        """Return ``open`` slots within the date window for the public catalog.
+        """Return public timetable rows within the date window.
 
-        Excludes ``full`` / ``cancelled`` / ``completed`` rows and rows whose
-        ``enrolled_count >= capacity``. Ordered by ``starts_at`` ascending.
+        Bookable rows are scoped to ``service_id`` and must still have
+        capacity. Private 1-1 busy-teaching blocks are returned only when the
+        visitor is choosing private coaching, so group classes remain focused
+        on joinable cohorts.
         """
         result = await self.session.execute(
             text(
@@ -68,9 +70,19 @@ class ChessScheduleSlotRepository(BaseRepository):
                   s.metadata
                 from chess_course_schedule_slots s
                 where s.tenant_id = cast(:tenant_id as uuid)
-                  and s.service_id = :service_id
-                  and s.status = 'open'
-                  and s.enrolled_count < s.capacity
+                  and (
+                    (
+                      s.service_id = :service_id
+                      and s.status = 'open'
+                      and s.enrolled_count < s.capacity
+                    )
+                    or (
+                      s.service_id = :service_id
+                      and
+                      coalesce(s.metadata->>'schedule_kind', '') = 'busy_teaching'
+                      and s.status in ('full', 'completed')
+                    )
+                  )
                   and s.starts_at >= :starts_from
                   and s.starts_at < :starts_to
                 order by s.starts_at asc
@@ -358,6 +370,55 @@ class ChessScheduleSlotRepository(BaseRepository):
                   and tenant_id = cast(:tenant_id as uuid)
                   and status = 'open'
                   and enrolled_count < capacity
+                returning
+                  id::text as id,
+                  tenant_id::text as tenant_id,
+                  service_id,
+                  starts_at,
+                  duration_minutes,
+                  timezone,
+                  capacity,
+                  enrolled_count,
+                  cohort_label,
+                  status,
+                  zoho_meeting_url,
+                  zoho_calendar_event_url
+                """
+            ),
+            {"tenant_id": tenant_id, "slot_id": slot_id},
+        )
+        row = result.mappings().first()
+        return dict(row) if row else None
+
+    async def release_capacity(
+        self,
+        *,
+        tenant_id: str,
+        slot_id: str,
+    ) -> dict[str, Any] | None:
+        """Atomically decrement ``enrolled_count`` when a booking is released.
+
+        Mirrors :meth:`reserve_capacity`: returns the updated row, or ``None``
+        when the slot is cancelled (we never touch a cancelled row). Also
+        auto-flips ``status='full'`` back to ``'open'`` when the decrement
+        re-opens capacity.
+        """
+        result = await self.session.execute(
+            text(
+                """
+                update chess_course_schedule_slots
+                set
+                  enrolled_count = GREATEST(enrolled_count - 1, 0),
+                  status = case
+                    when status = 'full'
+                      and GREATEST(enrolled_count - 1, 0) < capacity
+                      then 'open'
+                    else status
+                  end,
+                  updated_at = now()
+                where id = cast(:slot_id as uuid)
+                  and tenant_id = cast(:tenant_id as uuid)
+                  and status <> 'cancelled'
                 returning
                   id::text as id,
                   tenant_id::text as tenant_id,

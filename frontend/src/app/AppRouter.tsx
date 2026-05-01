@@ -24,6 +24,10 @@ const FutureSwimApp = lazy(async () => {
   const module = await import('../apps/public/FutureSwimApp');
   return { default: module.FutureSwimApp };
 });
+const FutureSwimParentPortalApp = lazy(async () => {
+  const module = await import('../apps/public/FutureSwimParentPortalApp');
+  return { default: module.FutureSwimParentPortalApp };
+});
 const ChessGrandmasterApp = lazy(async () => {
   const module = await import('../apps/public/ChessGrandmasterApp');
   return { default: module.ChessGrandmasterApp };
@@ -188,6 +192,19 @@ function isFutureSwimRuntime() {
     pathname === '/futureswim' ||
     pathname === '/futureswim/'
   );
+}
+
+function isFutureSwimPortalRuntime() {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const { hostname, pathname } = window.location;
+  const portalPath = pathname === '/portal' || pathname.startsWith('/portal/');
+  if (hostname === 'futureswim.bookedai.au' && portalPath) {
+    return true;
+  }
+  return pathname === '/futureswim/portal' || pathname.startsWith('/futureswim/portal/');
 }
 
 function isAIMentorProRuntime() {
@@ -493,6 +510,14 @@ export function AppRouter() {
     return (
       <Suspense fallback={fallback}>
         <DemoLandingApp />
+      </Suspense>
+    );
+  }
+
+  if (isFutureSwimPortalRuntime()) {
+    return (
+      <Suspense fallback={fallback}>
+        <FutureSwimParentPortalApp />
       </Suspense>
     );
   }

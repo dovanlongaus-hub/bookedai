@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type ReactNode,
 } from 'react';
 
 import '../../theme/aimentor-tokens.css';
@@ -33,6 +34,8 @@ type StudentBookingSummary = {
   timezone: string | null;
   status: string;
   payment_status: string;
+  cancel_eligibility?: boolean;
+  reschedule_eligibility?: boolean;
 };
 
 type StudentProgressEntry = {
@@ -135,6 +138,27 @@ const dict = {
       tableService: 'Program',
       tableStatus: 'Status',
       tablePayment: 'Payment',
+      tableActions: 'Actions',
+      actionCancel: 'Cancel',
+      actionReschedule: 'Reschedule',
+      cancelModalTitle: 'Cancel booking',
+      cancelModalBody: (service: string, date: string) =>
+        `Cancel your ${service} booking on ${date}? Any payment will be refunded per policy. This cannot be undone.`,
+      cancelReasonLabel: 'Reason (optional)',
+      cancelConfirmCta: 'Confirm cancel',
+      cancelKeepCta: 'Keep booking',
+      cancelSuccess: 'Booking cancelled',
+      cancelGenericError: 'Could not cancel booking. Please try again.',
+      rescheduleModalTitle: 'Reschedule booking',
+      rescheduleModalBody: (service: string, date: string) =>
+        `Pick a new date and time for your ${service} booking (currently ${date}).`,
+      rescheduleNewSlotLabel: 'New date and time',
+      rescheduleNoteLabel: 'Note for mentor (optional)',
+      rescheduleConfirmCta: 'Confirm reschedule',
+      rescheduleCancelCta: 'Keep current time',
+      rescheduleSuccess: 'Booking rescheduled',
+      rescheduleGenericError: 'Could not reschedule. Please try again.',
+      rescheduleSlotMissing: 'Please pick a new date and time.',
       progressDate: 'Session date',
       progressTrack: 'Track',
       progressLevel: 'Skill level',
@@ -212,6 +236,27 @@ const dict = {
       tableService: 'Chương trình',
       tableStatus: 'Trạng thái',
       tablePayment: 'Thanh toán',
+      tableActions: 'Thao tác',
+      actionCancel: 'Huỷ',
+      actionReschedule: 'Đổi lịch',
+      cancelModalTitle: 'Huỷ buổi học',
+      cancelModalBody: (service: string, date: string) =>
+        `Huỷ buổi học ${service} ngày ${date}? Khoản thanh toán (nếu có) sẽ được hoàn theo chính sách. Hành động này không thể hoàn tác.`,
+      cancelReasonLabel: 'Lý do (không bắt buộc)',
+      cancelConfirmCta: 'Xác nhận huỷ',
+      cancelKeepCta: 'Giữ booking',
+      cancelSuccess: 'Đã huỷ booking',
+      cancelGenericError: 'Không thể huỷ booking. Vui lòng thử lại.',
+      rescheduleModalTitle: 'Đổi lịch buổi học',
+      rescheduleModalBody: (service: string, date: string) =>
+        `Chọn ngày giờ mới cho buổi học ${service} (hiện tại: ${date}).`,
+      rescheduleNewSlotLabel: 'Ngày giờ mới',
+      rescheduleNoteLabel: 'Ghi chú cho mentor (không bắt buộc)',
+      rescheduleConfirmCta: 'Xác nhận đổi lịch',
+      rescheduleCancelCta: 'Giữ giờ hiện tại',
+      rescheduleSuccess: 'Đã đổi lịch buổi học',
+      rescheduleGenericError: 'Không thể đổi lịch. Vui lòng thử lại.',
+      rescheduleSlotMissing: 'Vui lòng chọn ngày giờ mới.',
       progressDate: 'Ngày buổi học',
       progressTrack: 'Track',
       progressLevel: 'Trình độ',
@@ -414,9 +459,13 @@ const cellBodyStyle: CSSProperties = {
 function BookingsTable({
   bookings,
   t,
+  onCancel,
+  onReschedule,
 }: {
   bookings: StudentBookingSummary[];
   t: Dict;
+  onCancel: (booking: StudentBookingSummary) => void;
+  onReschedule: (booking: StudentBookingSummary) => void;
 }) {
   if (!bookings.length) {
     return (
@@ -449,27 +498,117 @@ function BookingsTable({
             <th style={cellHeaderStyle}>{t.account.tableService}</th>
             <th style={cellHeaderStyle}>{t.account.tableStatus}</th>
             <th style={cellHeaderStyle}>{t.account.tablePayment}</th>
+            <th style={cellHeaderStyle}>{t.account.tableActions}</th>
           </tr>
         </thead>
         <tbody>
-          {bookings.map((booking) => (
-            <tr
-              key={booking.booking_intent_id}
-              style={{ borderTop: '1px solid var(--aim-line)' }}
-            >
-              <td style={cellBodyStyle}>{booking.requested_date || '—'}</td>
-              <td style={cellBodyStyle}>{booking.requested_time || '—'}</td>
-              <td style={cellBodyStyle}>{booking.service_name || '—'}</td>
-              <td style={cellBodyStyle}>
-                <StatusBadge value={booking.status} />
-              </td>
-              <td style={cellBodyStyle}>
-                <StatusBadge value={booking.payment_status} />
-              </td>
-            </tr>
-          ))}
+          {bookings.map((booking) => {
+            const lower = (booking.status || '').toLowerCase();
+            const terminal = lower.includes('cancel') || lower.includes('huỷ') || lower.includes('completed');
+            // Default to showing buttons when eligibility flag missing (backwards compat).
+            const showCancel = booking.cancel_eligibility !== false;
+            const showReschedule = booking.reschedule_eligibility !== false;
+            return (
+              <tr
+                key={booking.booking_intent_id}
+                style={{ borderTop: '1px solid var(--aim-line)' }}
+              >
+                <td style={cellBodyStyle}>{booking.requested_date || '—'}</td>
+                <td style={cellBodyStyle}>{booking.requested_time || '—'}</td>
+                <td style={cellBodyStyle}>{booking.service_name || '—'}</td>
+                <td style={cellBodyStyle}>
+                  <StatusBadge value={booking.status} />
+                </td>
+                <td style={cellBodyStyle}>
+                  <StatusBadge value={booking.payment_status} />
+                </td>
+                <td style={cellBodyStyle}>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {showCancel ? (
+                      <button
+                        type="button"
+                        className="aim-btn aim-btn-outline aim-btn-sm"
+                        disabled={terminal}
+                        onClick={() => onCancel(booking)}
+                      >
+                        {t.account.actionCancel}
+                      </button>
+                    ) : null}
+                    {showReschedule ? (
+                      <button
+                        type="button"
+                        className="aim-btn aim-btn-secondary aim-btn-sm"
+                        disabled={terminal}
+                        onClick={() => onReschedule(booking)}
+                      >
+                        {t.account.actionReschedule}
+                      </button>
+                    ) : null}
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+// ---------------- Modal scaffold -----------------------------------------
+
+const modalOverlayStyle: CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  background: 'rgba(15, 23, 42, 0.55)',
+  display: 'grid',
+  placeItems: 'center',
+  padding: 16,
+  zIndex: 1000,
+};
+
+const modalCardStyle: CSSProperties = {
+  background: '#fff',
+  borderRadius: 16,
+  padding: 24,
+  maxWidth: 480,
+  width: '100%',
+  boxShadow: '0 30px 60px rgba(15, 23, 42, 0.30)',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 14,
+};
+
+function ModalShell({
+  title,
+  onClose,
+  children,
+}: {
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+      style={modalOverlayStyle}
+      onClick={onClose}
+    >
+      <div style={modalCardStyle} onClick={(event) => event.stopPropagation()}>
+        <h3
+          className="aim-display"
+          style={{
+            margin: 0,
+            fontSize: '1.25rem',
+            color: 'var(--aim-ink)',
+          }}
+        >
+          {title}
+        </h3>
+        {children}
+      </div>
     </div>
   );
 }
@@ -646,6 +785,20 @@ export function AIMentorAccountApp() {
   const [accountLoading, setAccountLoading] = useState(false);
   const [accountError, setAccountError] = useState<string | null>(null);
 
+  // Cancel / reschedule modal state.
+  const [cancelTarget, setCancelTarget] = useState<StudentBookingSummary | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelSubmitting, setCancelSubmitting] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+
+  const [rescheduleTarget, setRescheduleTarget] = useState<StudentBookingSummary | null>(null);
+  const [rescheduleNewSlot, setRescheduleNewSlot] = useState('');
+  const [rescheduleNote, setRescheduleNote] = useState('');
+  const [rescheduleSubmitting, setRescheduleSubmitting] = useState(false);
+  const [rescheduleError, setRescheduleError] = useState<string | null>(null);
+
+  const [actionToast, setActionToast] = useState<string | null>(null);
+
   const googleClientId = (import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '').trim();
   const [googleReady, setGoogleReady] = useState(false);
   const googleButtonRef = useRef<HTMLDivElement | null>(null);
@@ -800,6 +953,131 @@ export function AIMentorAccountApp() {
     }
     void loadAccount(sessionToken);
   }, [sessionToken, loadAccount]);
+
+  // Auto-dismiss the action toast after a short delay.
+  useEffect(() => {
+    if (!actionToast) return;
+    const timer = window.setTimeout(() => setActionToast(null), 4000);
+    return () => window.clearTimeout(timer);
+  }, [actionToast]);
+
+  const openCancelModal = useCallback((booking: StudentBookingSummary) => {
+    setCancelTarget(booking);
+    setCancelReason('');
+    setCancelError(null);
+  }, []);
+
+  const closeCancelModal = useCallback(() => {
+    if (cancelSubmitting) return;
+    setCancelTarget(null);
+    setCancelReason('');
+    setCancelError(null);
+  }, [cancelSubmitting]);
+
+  const openRescheduleModal = useCallback((booking: StudentBookingSummary) => {
+    setRescheduleTarget(booking);
+    setRescheduleNewSlot('');
+    setRescheduleNote('');
+    setRescheduleError(null);
+  }, []);
+
+  const closeRescheduleModal = useCallback(() => {
+    if (rescheduleSubmitting) return;
+    setRescheduleTarget(null);
+    setRescheduleNewSlot('');
+    setRescheduleNote('');
+    setRescheduleError(null);
+  }, [rescheduleSubmitting]);
+
+  const submitCancel = useCallback(async () => {
+    if (!cancelTarget || !sessionToken) return;
+    setCancelSubmitting(true);
+    setCancelError(null);
+    const reason = cancelReason.trim();
+    const { ok, payload } = await callJson<{
+      success?: boolean;
+      idempotent?: boolean;
+      error?: { message?: string };
+    }>(`/api/v1/booking/${encodeURIComponent(cancelTarget.booking_reference)}/cancel`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${sessionToken}`,
+      },
+      body: JSON.stringify({ reason: reason || null }),
+    });
+    setCancelSubmitting(false);
+    if (!ok || !payload || payload.success === false) {
+      setCancelError(payload?.error?.message || t.account.cancelGenericError);
+      return;
+    }
+    setCancelTarget(null);
+    setCancelReason('');
+    setActionToast(t.account.cancelSuccess);
+    void loadAccount(sessionToken);
+  }, [cancelTarget, cancelReason, sessionToken, loadAccount, t.account.cancelGenericError, t.account.cancelSuccess]);
+
+  const submitReschedule = useCallback(async () => {
+    if (!rescheduleTarget || !sessionToken) return;
+    if (!rescheduleNewSlot) {
+      setRescheduleError(t.account.rescheduleSlotMissing);
+      return;
+    }
+    setRescheduleSubmitting(true);
+    setRescheduleError(null);
+    // Convert the local datetime-local string (no TZ) to ISO 8601 by letting
+    // the JS Date constructor interpret it as the user's local time.
+    let isoNewStart: string;
+    try {
+      const parsed = new Date(rescheduleNewSlot);
+      if (Number.isNaN(parsed.getTime())) throw new Error('invalid');
+      isoNewStart = parsed.toISOString();
+    } catch {
+      setRescheduleSubmitting(false);
+      setRescheduleError(t.account.rescheduleSlotMissing);
+      return;
+    }
+    const userTz =
+      typeof Intl !== 'undefined' && Intl.DateTimeFormat
+        ? Intl.DateTimeFormat().resolvedOptions().timeZone
+        : null;
+    const note = rescheduleNote.trim();
+    // TODO Phase 2: replace with full slot picker (mirror AIMentorChat's slot grid).
+    const { ok, payload } = await callJson<{
+      success?: boolean;
+      error?: { message?: string };
+    }>(`/api/v1/booking/${encodeURIComponent(rescheduleTarget.booking_reference)}/reschedule`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${sessionToken}`,
+      },
+      body: JSON.stringify({
+        new_start_at: isoNewStart,
+        ...(userTz ? { new_timezone: userTz } : {}),
+        ...(note ? { customer_note: note } : {}),
+      }),
+    });
+    setRescheduleSubmitting(false);
+    if (!ok || !payload || payload.success === false) {
+      setRescheduleError(payload?.error?.message || t.account.rescheduleGenericError);
+      return;
+    }
+    setRescheduleTarget(null);
+    setRescheduleNewSlot('');
+    setRescheduleNote('');
+    setActionToast(t.account.rescheduleSuccess);
+    void loadAccount(sessionToken);
+  }, [
+    rescheduleTarget,
+    rescheduleNewSlot,
+    rescheduleNote,
+    sessionToken,
+    loadAccount,
+    t.account.rescheduleGenericError,
+    t.account.rescheduleSuccess,
+    t.account.rescheduleSlotMissing,
+  ]);
 
   const handleSignOut = useCallback(async () => {
     const token = sessionToken;
@@ -1172,7 +1450,12 @@ export function AIMentorAccountApp() {
                     {t.account.bookingsLead}
                   </p>
                 </div>
-                <BookingsTable bookings={account?.bookings ?? []} t={t} />
+                <BookingsTable
+                  bookings={account?.bookings ?? []}
+                  t={t}
+                  onCancel={openCancelModal}
+                  onReschedule={openRescheduleModal}
+                />
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -1208,6 +1491,162 @@ export function AIMentorAccountApp() {
           </div>
         </div>
       </footer>
+
+      {actionToast ? (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            position: 'fixed',
+            bottom: 24,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'var(--aim-ink)',
+            color: '#fff',
+            padding: '12px 20px',
+            borderRadius: 999,
+            fontSize: '0.92rem',
+            fontWeight: 600,
+            boxShadow: '0 18px 32px rgba(15, 23, 42, 0.30)',
+            zIndex: 1100,
+          }}
+        >
+          {actionToast}
+        </div>
+      ) : null}
+
+      {cancelTarget ? (
+        <ModalShell title={t.account.cancelModalTitle} onClose={closeCancelModal}>
+          <p style={{ margin: 0, color: 'var(--aim-text)', lineHeight: 1.6, fontSize: '0.95rem' }}>
+            {t.account.cancelModalBody(
+              cancelTarget.service_name || '—',
+              cancelTarget.requested_date || '—',
+            )}
+          </p>
+          <label
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 6,
+              fontSize: '0.85rem',
+              color: 'var(--aim-muted)',
+              fontWeight: 600,
+            }}
+          >
+            {t.account.cancelReasonLabel}
+            <textarea
+              className="aim-input"
+              value={cancelReason}
+              onChange={(event) => setCancelReason(event.target.value)}
+              rows={3}
+              style={{ resize: 'vertical', minHeight: 70 }}
+              disabled={cancelSubmitting}
+            />
+          </label>
+          {cancelError ? (
+            <div className="aim-status-error" role="alert">
+              {cancelError}
+            </div>
+          ) : null}
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className="aim-btn aim-btn-outline aim-btn-sm"
+              onClick={closeCancelModal}
+              disabled={cancelSubmitting}
+            >
+              {t.account.cancelKeepCta}
+            </button>
+            <button
+              type="button"
+              className="aim-btn aim-btn-sm"
+              onClick={() => void submitCancel()}
+              disabled={cancelSubmitting}
+              style={{
+                background: 'var(--aim-danger)',
+                color: '#fff',
+                border: '1px solid var(--aim-danger)',
+              }}
+            >
+              {t.account.cancelConfirmCta}
+            </button>
+          </div>
+        </ModalShell>
+      ) : null}
+
+      {rescheduleTarget ? (
+        <ModalShell title={t.account.rescheduleModalTitle} onClose={closeRescheduleModal}>
+          <p style={{ margin: 0, color: 'var(--aim-text)', lineHeight: 1.6, fontSize: '0.95rem' }}>
+            {t.account.rescheduleModalBody(
+              rescheduleTarget.service_name || '—',
+              `${rescheduleTarget.requested_date || '—'} ${rescheduleTarget.requested_time || ''}`.trim(),
+            )}
+          </p>
+          <label
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 6,
+              fontSize: '0.85rem',
+              color: 'var(--aim-muted)',
+              fontWeight: 600,
+            }}
+          >
+            {t.account.rescheduleNewSlotLabel}
+            {/* TODO Phase 2: replace with full slot picker (reuse AIMentorChat slot grid). */}
+            <input
+              type="datetime-local"
+              className="aim-input"
+              value={rescheduleNewSlot}
+              onChange={(event) => setRescheduleNewSlot(event.target.value)}
+              disabled={rescheduleSubmitting}
+            />
+          </label>
+          <label
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 6,
+              fontSize: '0.85rem',
+              color: 'var(--aim-muted)',
+              fontWeight: 600,
+            }}
+          >
+            {t.account.rescheduleNoteLabel}
+            <textarea
+              className="aim-input"
+              value={rescheduleNote}
+              onChange={(event) => setRescheduleNote(event.target.value)}
+              rows={2}
+              style={{ resize: 'vertical', minHeight: 56 }}
+              disabled={rescheduleSubmitting}
+            />
+          </label>
+          {rescheduleError ? (
+            <div className="aim-status-error" role="alert">
+              {rescheduleError}
+            </div>
+          ) : null}
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className="aim-btn aim-btn-outline aim-btn-sm"
+              onClick={closeRescheduleModal}
+              disabled={rescheduleSubmitting}
+            >
+              {t.account.rescheduleCancelCta}
+            </button>
+            <button
+              type="button"
+              className="aim-btn aim-btn-primary aim-btn-sm"
+              onClick={() => void submitReschedule()}
+              disabled={rescheduleSubmitting}
+            >
+              {t.account.rescheduleConfirmCta}
+            </button>
+          </div>
+        </ModalShell>
+      ) : null}
     </div>
   );
 }

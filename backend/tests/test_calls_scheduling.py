@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest import TestCase
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
-from service_layer.calls_scheduling import get_zoho_access_token
+from service_layer.calls_scheduling import (
+    cancel_zoho_meeting_for_booking,
+    get_zoho_access_token,
+    update_zoho_meeting_time_for_booking,
+)
 
 
 class _TokenResponse:
@@ -58,3 +63,102 @@ class ZohoCalendarTokenTestCase(TestCase):
             "https://accounts.zoho.com.au/oauth/v2/token",
         )
         self.assertEqual(_AsyncClient.post_calls[0]["data"]["grant_type"], "refresh_token")
+
+
+class CancelZohoMeetingForBookingTestCase(TestCase):
+    def test_returns_cancelled_status_on_success(self):
+        settings = SimpleNamespace()
+        adapter = SimpleNamespace(
+            cancel_meeting=AsyncMock(
+                return_value={
+                    "provider": "zoho_meeting",
+                    "meeting_id": "abc-123",
+                    "status": "deleted",
+                }
+            )
+        )
+        with patch(
+            "integrations.zoho_meeting.ZohoMeetingAdapter",
+            return_value=adapter,
+        ):
+            result = asyncio.run(
+                cancel_zoho_meeting_for_booking(settings, meeting_id="abc-123")
+            )
+
+        self.assertEqual(result["status"], "cancelled")
+        self.assertEqual(result["meeting_id"], "abc-123")
+        adapter.cancel_meeting.assert_awaited_once_with(settings, meeting_id="abc-123")
+
+    def test_returns_failed_status_on_value_error(self):
+        settings = SimpleNamespace()
+        adapter = SimpleNamespace(
+            cancel_meeting=AsyncMock(side_effect=ValueError("creds incomplete"))
+        )
+        with patch(
+            "integrations.zoho_meeting.ZohoMeetingAdapter",
+            return_value=adapter,
+        ):
+            result = asyncio.run(
+                cancel_zoho_meeting_for_booking(settings, meeting_id="abc-123")
+            )
+
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["meeting_id"], "abc-123")
+        self.assertIn("creds incomplete", result["error"])
+
+
+class UpdateZohoMeetingTimeForBookingTestCase(TestCase):
+    def test_returns_updated_status_on_success(self):
+        settings = SimpleNamespace()
+        adapter = SimpleNamespace(
+            update_meeting_time=AsyncMock(
+                return_value={
+                    "provider": "zoho_meeting",
+                    "meeting_id": "abc-123",
+                    "start_time_iso": "2026-05-01T03:00:00Z",
+                    "duration_minutes": 45,
+                    "status": "updated",
+                }
+            )
+        )
+        new_start = datetime(2026, 5, 1, 3, 0, tzinfo=timezone.utc)
+        with patch(
+            "integrations.zoho_meeting.ZohoMeetingAdapter",
+            return_value=adapter,
+        ):
+            result = asyncio.run(
+                update_zoho_meeting_time_for_booking(
+                    settings,
+                    meeting_id="abc-123",
+                    new_start_at=new_start,
+                    duration_minutes=45,
+                )
+            )
+
+        self.assertEqual(result["status"], "updated")
+        self.assertEqual(result["meeting_id"], "abc-123")
+        self.assertEqual(result["duration_minutes"], 45)
+        adapter.update_meeting_time.assert_awaited_once()
+
+    def test_returns_failed_status_on_value_error(self):
+        settings = SimpleNamespace()
+        adapter = SimpleNamespace(
+            update_meeting_time=AsyncMock(side_effect=ValueError("bad duration"))
+        )
+        new_start = datetime(2026, 5, 1, 3, 0, tzinfo=timezone.utc)
+        with patch(
+            "integrations.zoho_meeting.ZohoMeetingAdapter",
+            return_value=adapter,
+        ):
+            result = asyncio.run(
+                update_zoho_meeting_time_for_booking(
+                    settings,
+                    meeting_id="abc-123",
+                    new_start_at=new_start,
+                    duration_minutes=45,
+                )
+            )
+
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["meeting_id"], "abc-123")
+        self.assertIn("bad duration", result["error"])

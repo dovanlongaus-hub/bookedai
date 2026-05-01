@@ -1268,6 +1268,118 @@ class CommunicationServiceDeliveryFallbackTestCase(IsolatedAsyncioTestCase):
         self.assertTrue(result.warnings)
         self.assertIn("manual review", result.warnings[0].lower())
 
+    async def test_send_whatsapp_meta_formats_html_and_sends_reply_buttons(self):
+        settings = replace(
+            _build_test_settings(),
+            whatsapp_provider="meta",
+            whatsapp_fallback_provider="",
+            whatsapp_from_number="+61455301335",
+            whatsapp_meta_phone_number_id="meta-phone-id",
+            whatsapp_meta_access_token="meta-token",
+        )
+        service = CommunicationService(settings)
+        captured_payload: dict[str, object] = {}
+
+        class _FakeAsyncClient:
+            def __init__(self, *args, **kwargs):
+                return None
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc, tb):
+                return False
+
+            async def post(self, url, **kwargs):
+                captured_payload["url"] = url
+                captured_payload["json"] = kwargs.get("json")
+                return httpx.Response(
+                    200,
+                    request=httpx.Request("POST", url),
+                    json={"messages": [{"id": "wamid.TEST"}]},
+                )
+
+        with patch("service_layer.communication_service.httpx.AsyncClient", _FakeAsyncClient):
+            result = await service.send_whatsapp(
+                to="+61400000000",
+                body='<b>Booking found</b>\n<code>v1-test</code>\n<a href="https://bookedai.au">Open BookedAI</a>',
+                parse_mode="HTML",
+                reply_markup={
+                    "inline_keyboard": [
+                        [
+                            {"text": "Change time", "callback_data": "reschedule:date:v1-test"},
+                            {"text": "Cancel", "callback_data": "Cancel current booking v1-test"},
+                        ]
+                    ]
+                },
+            )
+
+        self.assertEqual(result.provider, "whatsapp_meta")
+        self.assertEqual(result.delivery_status, "sent")
+        self.assertEqual(result.provider_message_id, "wamid.TEST")
+        payload = captured_payload["json"]
+        self.assertEqual(payload["type"], "interactive")
+        self.assertEqual(payload["interactive"]["type"], "button")
+        self.assertIn("*Booking found*", payload["interactive"]["body"]["text"])
+        self.assertIn("`v1-test`", payload["interactive"]["body"]["text"])
+        self.assertIn("Open BookedAI: https://bookedai.au", payload["interactive"]["body"]["text"])
+        self.assertEqual(
+            payload["interactive"]["action"]["buttons"][0]["reply"]["id"],
+            "reschedule:date:v1-test",
+        )
+
+    async def test_send_whatsapp_meta_uses_list_for_many_booking_actions(self):
+        settings = replace(
+            _build_test_settings(),
+            whatsapp_provider="meta",
+            whatsapp_fallback_provider="",
+            whatsapp_from_number="+61455301335",
+            whatsapp_meta_phone_number_id="meta-phone-id",
+            whatsapp_meta_access_token="meta-token",
+        )
+        service = CommunicationService(settings)
+        captured_payload: dict[str, object] = {}
+
+        class _FakeAsyncClient:
+            def __init__(self, *args, **kwargs):
+                return None
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc, tb):
+                return False
+
+            async def post(self, url, **kwargs):
+                captured_payload["json"] = kwargs.get("json")
+                return httpx.Response(
+                    200,
+                    request=httpx.Request("POST", url),
+                    json={"messages": [{"id": "wamid.LIST"}]},
+                )
+
+        with patch("service_layer.communication_service.httpx.AsyncClient", _FakeAsyncClient):
+            result = await service.send_whatsapp(
+                to="+61400000000",
+                body="Choose a booking action",
+                reply_markup={
+                    "inline_keyboard": [
+                        [{"text": "Book 1", "callback_data": "Book 1"}],
+                        [{"text": "Find new", "callback_data": "Find another booking option"}],
+                        [{"text": "Change time", "callback_data": "reschedule:date:v1-test"}],
+                        [{"text": "Cancel", "callback_data": "Cancel current booking v1-test"}],
+                    ]
+                },
+            )
+
+        self.assertEqual(result.delivery_status, "sent")
+        payload = captured_payload["json"]
+        self.assertEqual(payload["type"], "interactive")
+        self.assertEqual(payload["interactive"]["type"], "list")
+        rows = payload["interactive"]["action"]["sections"][0]["rows"]
+        self.assertEqual(rows[2]["id"], "reschedule:date:v1-test")
+        self.assertEqual(rows[3]["id"], "Cancel current booking v1-test")
+
     async def test_send_whatsapp_uses_twilio_backup_when_meta_primary_is_unconfigured(self):
         settings = replace(
             _build_test_settings(),
@@ -1276,6 +1388,7 @@ class CommunicationServiceDeliveryFallbackTestCase(IsolatedAsyncioTestCase):
             whatsapp_twilio_account_sid="AC123",
             whatsapp_twilio_api_key_sid="SK123",
             whatsapp_twilio_api_key_secret="secret",
+            whatsapp_twilio_from_number="+15559399566",
             whatsapp_from_number="+61455301335",
             whatsapp_meta_phone_number_id="",
             whatsapp_meta_access_token="",
@@ -1295,7 +1408,7 @@ class CommunicationServiceDeliveryFallbackTestCase(IsolatedAsyncioTestCase):
 
             async def post(self, url, **kwargs):
                 test_case.assertIn("/Accounts/AC123/Messages.json", url)
-                test_case.assertEqual(kwargs["data"]["From"], "whatsapp:+61455301335")
+                test_case.assertEqual(kwargs["data"]["From"], "whatsapp:+15559399566")
                 return httpx.Response(
                     201,
                     request=httpx.Request("POST", url),
@@ -1493,3 +1606,504 @@ class CommunicationServiceDeliveryFallbackTestCase(IsolatedAsyncioTestCase):
 
         self.assertTrue(service.whatsapp_configured())
         self.assertEqual(service.whatsapp_delivery_provider_name(), "whatsapp_evolution")
+
+
+# ---------------------------------------------------------------------------
+# Phase 1 lifecycle orchestrators: cancel + reschedule
+# ---------------------------------------------------------------------------
+#
+# The cancellation/reschedule orchestrators are append-only additions; their
+# happy-path involves several repository writes + a Zoho CRM push + a Zoho
+# Meeting call + an outbox event + an email + telegram/whatsapp touches. We
+# stub each of those at the import site so the orchestrator runs to
+# completion without a real session/database.
+
+
+from datetime import datetime, timezone  # noqa: E402
+from unittest.mock import AsyncMock  # noqa: E402
+
+from service_layer.lifecycle_ops_service import (  # noqa: E402
+    orchestrate_booking_cancelled,
+    orchestrate_booking_rescheduled,
+)
+
+
+class _FakeBookingIntentRepository:
+    """Stand-in for :class:`BookingIntentRepository` used by the cancel +
+    reschedule orchestrators. Captures kwargs for later assertions."""
+
+    last_instance: "_FakeBookingIntentRepository | None" = None
+
+    def __init__(self, _context):
+        self.sync_callback_status_calls: list[dict] = []
+        self.update_slot_assignment_calls: list[dict] = []
+        type(self).last_instance = self
+
+    async def sync_callback_status(self, **kwargs):
+        self.sync_callback_status_calls.append(kwargs)
+        return {}
+
+    async def update_slot_assignment(self, **kwargs):
+        self.update_slot_assignment_calls.append(kwargs)
+        return None
+
+
+class _FakeOutboxRepository:
+    """Stand-in for :class:`OutboxRepository`. ``next_event_id`` controls
+    the value returned by ``enqueue_event``; if ``raise_on_call_index`` is
+    set, the corresponding invocation raises (used to simulate UNIQUE on
+    idempotency_key)."""
+
+    instances: list["_FakeOutboxRepository"] = []
+    next_event_id: int = 9001
+    raise_on_call_index: int | None = None
+    _global_call_count: int = 0
+
+    def __init__(self, _context):
+        self.enqueued_events: list[dict] = []
+        type(self).instances.append(self)
+
+    async def enqueue_event(self, **kwargs):
+        type(self)._global_call_count += 1
+        if (
+            type(self).raise_on_call_index is not None
+            and type(self)._global_call_count - 1 == type(self).raise_on_call_index
+        ):
+            raise RuntimeError("simulated unique constraint on idempotency_key")
+        self.enqueued_events.append(kwargs)
+        # Return a fresh id per call so we can assert idempotency.
+        type(self).next_event_id += 1
+        return type(self).next_event_id
+
+
+class _FakeChessScheduleSlotRepository:
+    """Used by the reschedule orchestrator's chess-capacity branch. The
+    cancel orchestrator never touches it."""
+
+    def __init__(self, _context):
+        self.released_slots: list[str] = []
+        self.reserved_slots: list[str] = []
+
+    async def get_slot_for_booking(self, **_kwargs):
+        return None  # default: behave as non-chess
+
+    async def release_capacity(self, *, tenant_id, slot_id):  # noqa: ARG002
+        self.released_slots.append(slot_id)
+        return True
+
+    async def reserve_capacity(self, *, tenant_id, slot_id):  # noqa: ARG002
+        self.reserved_slots.append(slot_id)
+        return True
+
+
+class _StubSession:
+    """Minimal session shim. ``orchestrate_communication_touch`` calls
+    ``session.add(ConversationEvent(...))`` so we accept any add call."""
+
+    def __init__(self):
+        self.added_objects: list[object] = []
+
+    def add(self, obj):
+        self.added_objects.append(obj)
+
+
+def _make_lifecycle_context(
+    *,
+    booking_reference: str = "AIM-LC-001",
+    booking_intent_id: str = "bi-lc-001",
+    tenant_id: str = "tenant-lc",
+    status: str = "paid",
+    meeting_id: str | None = "zoho-meeting-1",
+    customer_email: str | None = "student@example.com",
+    customer_name: str | None = "Test Student",
+    service_name: str | None = "AI Mentor Trial",
+    booking_path: str | None = "ai_mentor",
+    requested_date: str | None = "2026-05-15",
+    requested_time: str | None = "10:30",
+    timezone_label: str | None = "Australia/Sydney",
+    contact_id: str | None = "contact-lc-1",
+) -> dict:
+    metadata: dict = {}
+    if meeting_id:
+        metadata["zoho_meeting"] = {
+            "meeting_id": meeting_id,
+            "meeting_url": "https://meet.zoho.com/lc-1",
+        }
+    return {
+        "booking_intent_id": booking_intent_id,
+        "tenant_id": tenant_id,
+        "booking_reference": booking_reference,
+        "status": status,
+        "service_name": service_name,
+        "requested_date": requested_date,
+        "requested_time": requested_time,
+        "timezone": timezone_label,
+        "booking_path": booking_path,
+        "payment_dependency_state": "paid",
+        "booking_metadata": metadata,
+        "contact_id": contact_id,
+        "customer_name": customer_name,
+        "customer_email": customer_email,
+        "customer_phone": "+61400000000",
+    }
+
+
+class BookingLifecycleOrchestratorTestCase(IsolatedAsyncioTestCase):
+    """Unit tests for the cancel + reschedule orchestrators."""
+
+    async def asyncSetUp(self):
+        _FakeCrmSyncRepository.instances.clear()
+        _FakeCrmSyncRepository.next_record = None
+        _FakeCrmSyncRepository.next_record_id = 71
+        _FakeEmailRepository.instances.clear()
+        _FakeOutboxRepository.instances.clear()
+        _FakeOutboxRepository.next_event_id = 9001
+        _FakeOutboxRepository.raise_on_call_index = None
+        _FakeOutboxRepository._global_call_count = 0
+        _FakeBookingIntentRepository.last_instance = None
+
+    def _common_patches(self, *, lookup_context: dict | None):
+        async def _lookup(*_args, **_kwargs):
+            return lookup_context
+
+        return [
+            patch(
+                "service_layer.lifecycle_ops_service._lookup_booking_lifecycle_context",
+                _lookup,
+            ),
+            patch(
+                "service_layer.lifecycle_ops_service.BookingIntentRepository",
+                _FakeBookingIntentRepository,
+            ),
+            patch(
+                "service_layer.lifecycle_ops_service.OutboxRepository",
+                _FakeOutboxRepository,
+            ),
+            patch(
+                "service_layer.lifecycle_ops_service.ChessScheduleSlotRepository",
+                _FakeChessScheduleSlotRepository,
+            ),
+            patch(
+                "service_layer.lifecycle_ops_service.CrmSyncRepository",
+                _FakeCrmSyncRepository,
+            ),
+            patch(
+                "service_layer.lifecycle_ops_service.EmailRepository",
+                _FakeEmailRepository,
+            ),
+            patch(
+                "service_layer.lifecycle_ops_service.get_settings",
+                lambda: _build_test_settings(access_token="token"),
+            ),
+        ]
+
+    async def test_orchestrate_booking_cancelled_marks_synced_when_zoho_calls_succeed(self):
+        upsert_deal_mock = AsyncMock(
+            return_value={"status": "success", "external_entity_id": "zoho-deal-cxl-1"}
+        )
+        cancel_meeting_mock = AsyncMock(
+            return_value={"status": "cancelled", "meeting_id": "zoho-meeting-1"}
+        )
+
+        # The cancel orchestrator imports ``cancel_zoho_meeting_for_booking``
+        # lazily inside the function, so we patch the module symbol the
+        # ``from ... import`` would resolve.
+        import service_layer.calls_scheduling as calls_scheduling_module
+
+        ctx = _make_lifecycle_context()
+        with self._common_patches(lookup_context=ctx)[0], \
+             self._common_patches(lookup_context=ctx)[1], \
+             self._common_patches(lookup_context=ctx)[2], \
+             self._common_patches(lookup_context=ctx)[3], \
+             self._common_patches(lookup_context=ctx)[4], \
+             self._common_patches(lookup_context=ctx)[5], \
+             self._common_patches(lookup_context=ctx)[6], \
+             patch(
+                 "service_layer.lifecycle_ops_service.ZohoCrmAdapter.upsert_deal",
+                 upsert_deal_mock,
+             ), \
+             patch.object(
+                 calls_scheduling_module,
+                 "cancel_zoho_meeting_for_booking",
+                 cancel_meeting_mock,
+             ):
+            session = _StubSession()
+            result = await orchestrate_booking_cancelled(
+                session,
+                tenant_id="tenant-lc",
+                booking_reference="AIM-LC-001",
+                actor_type="student_session",
+                channel="web",
+            )
+
+        self.assertEqual(result["status"], "cancelled")
+        self.assertEqual(result["booking_reference"], "AIM-LC-001")
+        self.assertEqual(result["crm_sync"]["sync_status"], "synced")
+        self.assertEqual(result["meeting_cancellation"]["status"], "cancelled")
+        self.assertIsNotNone(result["outbox_event_id"])
+        self.assertIn("email", result)
+        self.assertIn("telegram", result["communications"])
+        self.assertIn("whatsapp", result["communications"])
+        upsert_deal_mock.assert_awaited_once()
+        cancel_meeting_mock.assert_awaited_once()
+
+    async def test_orchestrate_booking_cancelled_returns_already_cancelled_when_status_already_cancelled(self):
+        upsert_deal_mock = AsyncMock()
+        cancel_meeting_mock = AsyncMock()
+        ctx = _make_lifecycle_context(status="cancelled")
+
+        import service_layer.calls_scheduling as calls_scheduling_module
+
+        with self._common_patches(lookup_context=ctx)[0], \
+             self._common_patches(lookup_context=ctx)[1], \
+             self._common_patches(lookup_context=ctx)[2], \
+             self._common_patches(lookup_context=ctx)[3], \
+             self._common_patches(lookup_context=ctx)[4], \
+             self._common_patches(lookup_context=ctx)[5], \
+             self._common_patches(lookup_context=ctx)[6], \
+             patch(
+                 "service_layer.lifecycle_ops_service.ZohoCrmAdapter.upsert_deal",
+                 upsert_deal_mock,
+             ), \
+             patch.object(
+                 calls_scheduling_module,
+                 "cancel_zoho_meeting_for_booking",
+                 cancel_meeting_mock,
+             ):
+            session = _StubSession()
+            result = await orchestrate_booking_cancelled(
+                session,
+                tenant_id="tenant-lc",
+                booking_reference="AIM-LC-001",
+                actor_type="student_session",
+                channel="web",
+            )
+
+        self.assertEqual(result["status"], "already_cancelled")
+        upsert_deal_mock.assert_not_awaited()
+        cancel_meeting_mock.assert_not_awaited()
+        # No email repository constructed either.
+        self.assertEqual(len(_FakeEmailRepository.instances), 0)
+
+    async def test_orchestrate_booking_cancelled_marks_pending_when_zoho_fails(self):
+        upsert_deal_mock = AsyncMock(side_effect=httpx.ConnectError("zoho down"))
+        cancel_meeting_mock = AsyncMock(
+            return_value={"status": "cancelled", "meeting_id": "zoho-meeting-1"}
+        )
+        ctx = _make_lifecycle_context()
+
+        import service_layer.calls_scheduling as calls_scheduling_module
+
+        with self._common_patches(lookup_context=ctx)[0], \
+             self._common_patches(lookup_context=ctx)[1], \
+             self._common_patches(lookup_context=ctx)[2], \
+             self._common_patches(lookup_context=ctx)[3], \
+             self._common_patches(lookup_context=ctx)[4], \
+             self._common_patches(lookup_context=ctx)[5], \
+             self._common_patches(lookup_context=ctx)[6], \
+             patch(
+                 "service_layer.lifecycle_ops_service.ZohoCrmAdapter.upsert_deal",
+                 upsert_deal_mock,
+             ), \
+             patch.object(
+                 calls_scheduling_module,
+                 "cancel_zoho_meeting_for_booking",
+                 cancel_meeting_mock,
+             ):
+            session = _StubSession()
+            result = await orchestrate_booking_cancelled(
+                session,
+                tenant_id="tenant-lc",
+                booking_reference="AIM-LC-001",
+                actor_type="student_session",
+                channel="web",
+            )
+
+        self.assertEqual(result["status"], "cancelled")
+        self.assertEqual(result["crm_sync"]["sync_status"], "pending")
+        self.assertIn("crm_push_failed", result["warnings"])
+        # Outbox is still enqueued so downstream retries happen.
+        self.assertIsNotNone(result["outbox_event_id"])
+
+    async def test_orchestrate_booking_cancelled_emits_outbox_event_idempotently(self):
+        upsert_deal_mock = AsyncMock(
+            return_value={"status": "success", "external_entity_id": "zoho-deal-cxl-2"}
+        )
+        cancel_meeting_mock = AsyncMock(
+            return_value={"status": "cancelled", "meeting_id": "zoho-meeting-1"}
+        )
+        ctx_first = _make_lifecycle_context()
+        # Second call sees status == 'cancelled' (the orchestrator flipped
+        # the row on the first invocation; we mimic that by returning a
+        # cancelled context on the second lookup).
+        ctx_second = _make_lifecycle_context(status="cancelled")
+
+        import service_layer.calls_scheduling as calls_scheduling_module
+
+        # Sequenced lookup helper: first call returns ctx_first, second
+        # returns ctx_second. Failing the second outbox enqueue would also
+        # be acceptable per the task description, but the row-status path
+        # is the more realistic real-world flow.
+        contexts = iter([ctx_first, ctx_second])
+
+        async def _lookup(*_args, **_kwargs):
+            try:
+                return next(contexts)
+            except StopIteration:
+                return ctx_second
+
+        with patch(
+            "service_layer.lifecycle_ops_service._lookup_booking_lifecycle_context",
+            _lookup,
+        ), patch(
+            "service_layer.lifecycle_ops_service.BookingIntentRepository",
+            _FakeBookingIntentRepository,
+        ), patch(
+            "service_layer.lifecycle_ops_service.OutboxRepository",
+            _FakeOutboxRepository,
+        ), patch(
+            "service_layer.lifecycle_ops_service.ChessScheduleSlotRepository",
+            _FakeChessScheduleSlotRepository,
+        ), patch(
+            "service_layer.lifecycle_ops_service.CrmSyncRepository",
+            _FakeCrmSyncRepository,
+        ), patch(
+            "service_layer.lifecycle_ops_service.EmailRepository",
+            _FakeEmailRepository,
+        ), patch(
+            "service_layer.lifecycle_ops_service.get_settings",
+            lambda: _build_test_settings(access_token="token"),
+        ), patch(
+            "service_layer.lifecycle_ops_service.ZohoCrmAdapter.upsert_deal",
+            upsert_deal_mock,
+        ), patch.object(
+            calls_scheduling_module,
+            "cancel_zoho_meeting_for_booking",
+            cancel_meeting_mock,
+        ):
+            session = _StubSession()
+            first = await orchestrate_booking_cancelled(
+                session,
+                tenant_id="tenant-lc",
+                booking_reference="AIM-LC-001",
+                actor_type="student_session",
+                channel="web",
+            )
+            second = await orchestrate_booking_cancelled(
+                session,
+                tenant_id="tenant-lc",
+                booking_reference="AIM-LC-001",
+                actor_type="student_session",
+                channel="web",
+            )
+
+        self.assertEqual(first["status"], "cancelled")
+        # Idempotency contract: second call may return either status, but
+        # MUST NOT trigger a second Zoho push or outbox enqueue.
+        self.assertIn(second["status"], {"cancelled", "already_cancelled"})
+        self.assertEqual(upsert_deal_mock.await_count, 1)
+        # Outbox enqueued once (the second call short-circuits before the
+        # second row insert because status == cancelled).
+        self.assertEqual(
+            sum(len(repo.enqueued_events) for repo in _FakeOutboxRepository.instances),
+            1,
+        )
+
+    async def test_orchestrate_booking_rescheduled_updates_meeting_time(self):
+        update_meeting_mock = AsyncMock(
+            return_value={
+                "status": "updated",
+                "meeting_id": "zoho-meeting-1",
+                "start_time": "2026-05-20T10:30:00+10:00",
+            }
+        )
+        create_task_mock = AsyncMock(
+            return_value={"status": "success", "external_entity_id": "zoho-task-rs-1"}
+        )
+        ctx = _make_lifecycle_context(status="paid")
+
+        import service_layer.calls_scheduling as calls_scheduling_module
+
+        new_start_at = datetime(2026, 5, 20, 10, 30, tzinfo=timezone.utc)
+
+        with self._common_patches(lookup_context=ctx)[0], \
+             self._common_patches(lookup_context=ctx)[1], \
+             self._common_patches(lookup_context=ctx)[2], \
+             self._common_patches(lookup_context=ctx)[3], \
+             self._common_patches(lookup_context=ctx)[4], \
+             self._common_patches(lookup_context=ctx)[5], \
+             self._common_patches(lookup_context=ctx)[6], \
+             patch(
+                 "service_layer.lifecycle_ops_service.ZohoCrmAdapter.create_follow_up_task",
+                 create_task_mock,
+             ), \
+             patch.object(
+                 calls_scheduling_module,
+                 "update_zoho_meeting_time_for_booking",
+                 update_meeting_mock,
+             ):
+            session = _StubSession()
+            result = await orchestrate_booking_rescheduled(
+                session,
+                tenant_id="tenant-lc",
+                booking_reference="AIM-LC-001",
+                new_start_at=new_start_at,
+                actor_type="student_session",
+                channel="web",
+            )
+
+        self.assertEqual(result["status"], "rescheduled")
+        self.assertEqual(result["meeting_update"]["status"], "updated")
+        self.assertEqual(result["new_start_at"], new_start_at.isoformat())
+        self.assertEqual(result["new_timezone"], "Australia/Sydney")
+        self.assertIsNotNone(_FakeBookingIntentRepository.last_instance)
+        update_calls = _FakeBookingIntentRepository.last_instance.update_slot_assignment_calls
+        self.assertEqual(len(update_calls), 1)
+        self.assertEqual(update_calls[0]["new_requested_date"], "2026-05-20")
+        self.assertEqual(update_calls[0]["new_requested_time"], "10:30")
+        # sync_callback_status records the rescheduled metadata bag.
+        sync_calls = _FakeBookingIntentRepository.last_instance.sync_callback_status_calls
+        self.assertEqual(len(sync_calls), 1)
+        self.assertIn("rescheduled_at", sync_calls[0]["metadata_updates"])
+        update_meeting_mock.assert_awaited_once()
+
+    async def test_orchestrate_booking_rescheduled_returns_not_reschedulable_when_status_completed(self):
+        update_meeting_mock = AsyncMock()
+        create_task_mock = AsyncMock()
+        ctx = _make_lifecycle_context(status="completed")
+
+        import service_layer.calls_scheduling as calls_scheduling_module
+
+        new_start_at = datetime(2026, 5, 20, 10, 30, tzinfo=timezone.utc)
+
+        with self._common_patches(lookup_context=ctx)[0], \
+             self._common_patches(lookup_context=ctx)[1], \
+             self._common_patches(lookup_context=ctx)[2], \
+             self._common_patches(lookup_context=ctx)[3], \
+             self._common_patches(lookup_context=ctx)[4], \
+             self._common_patches(lookup_context=ctx)[5], \
+             self._common_patches(lookup_context=ctx)[6], \
+             patch(
+                 "service_layer.lifecycle_ops_service.ZohoCrmAdapter.create_follow_up_task",
+                 create_task_mock,
+             ), \
+             patch.object(
+                 calls_scheduling_module,
+                 "update_zoho_meeting_time_for_booking",
+                 update_meeting_mock,
+             ):
+            session = _StubSession()
+            result = await orchestrate_booking_rescheduled(
+                session,
+                tenant_id="tenant-lc",
+                booking_reference="AIM-LC-001",
+                new_start_at=new_start_at,
+                actor_type="student_session",
+                channel="web",
+            )
+
+        self.assertEqual(result["status"], "not_reschedulable")
+        self.assertEqual(result.get("current_status"), "completed")
+        update_meeting_mock.assert_not_awaited()
+        create_task_mock.assert_not_awaited()
+        self.assertEqual(len(_FakeEmailRepository.instances), 0)
