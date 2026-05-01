@@ -66,6 +66,8 @@ import {
   type TenantInviteMemberFormState,
 } from '../../features/tenant-team/TenantTeamWorkspace';
 import { TenantStudentsWorkspace } from '../../features/tenant-students/TenantStudentsWorkspace';
+import { TenantBroadcastWorkspace } from '../../features/tenant-broadcast/TenantBroadcastWorkspace';
+import { TenantCareListWorkspace } from '../../features/tenant-care-list/TenantCareListWorkspace';
 import { TenantIntegrationsWorkspace } from '../../features/tenant-integrations/TenantIntegrationsWorkspace';
 import {
   TenantPluginWorkspace,
@@ -79,7 +81,7 @@ import {
 } from '../../shared/presenters/partnerMatch';
 import { getApiBaseUrl } from '../../shared/config/api';
 
-type TenantPanel = 'overview' | 'experience' | 'catalog' | 'plugin' | 'bookings' | 'leads' | 'students' | 'operations' | 'integrations' | 'billing' | 'team';
+type TenantPanel = 'overview' | 'experience' | 'catalog' | 'plugin' | 'bookings' | 'leads' | 'students' | 'care' | 'broadcast' | 'operations' | 'integrations' | 'billing' | 'team';
 type CatalogStatusFilter = 'all' | 'search-ready' | 'needs-review' | 'inactive';
 
 type TenantLoadState =
@@ -310,6 +312,8 @@ function resolveInitialPanel(): TenantPanel {
     || hash === 'billing'
     || hash === 'operations'
     || hash === 'students'
+    || hash === 'care'
+    || hash === 'broadcast'
     || hash === 'team'
   ) {
     return hash;
@@ -3478,6 +3482,18 @@ export function TenantApp() {
       icon: <ShieldIcon className="h-4 w-4" />,
     },
     {
+      key: 'care',
+      label: 'Customer care',
+      description: 'Opt-in care list + monthly schedule reminder dispatch.',
+      icon: <SparkIcon className="h-4 w-4" />,
+    },
+    {
+      key: 'broadcast',
+      label: 'Broadcast',
+      description: 'Send notifications by region or to a single student.',
+      icon: <SparkIcon className="h-4 w-4" />,
+    },
+    {
       key: 'operations',
       label: 'Ops',
       description: 'BookedAI follow-up, reminders, and automation state.',
@@ -3503,8 +3519,8 @@ export function TenantApp() {
     },
   ];
   const activePanelMeta = tenantPanels.find((item) => item.key === panel) ?? tenantPanels[0];
-  const activePanelGuide = panel !== 'leads' && panel !== 'operations' && panel !== 'students'
-    ? overview.workspace.guides[panel === 'experience' ? 'experience' : panel as Exclude<typeof panel, 'leads' | 'operations' | 'students'>]
+  const activePanelGuide = panel !== 'leads' && panel !== 'operations' && panel !== 'students' && panel !== 'broadcast' && panel !== 'care'
+    ? overview.workspace.guides[panel === 'experience' ? 'experience' : panel as Exclude<typeof panel, 'leads' | 'operations' | 'students' | 'broadcast' | 'care'>]
     : undefined;
   const introPreview = stripHtmlPreview(overview.workspace.introduction_html);
   const activationState = deriveTenantActivationState({ session, onboarding, overview });
@@ -5559,6 +5575,14 @@ export function TenantApp() {
             saveErrorMessage={studentSaveError}
             onSaveProgress={handleSaveStudentProgress}
           />
+        ) : null}
+
+        {panel === 'broadcast' ? (
+          <TenantBroadcastWorkspace session={session} students={students} />
+        ) : null}
+
+        {panel === 'care' ? (
+          <TenantCareListWorkspace session={session} students={students} />
         ) : null}
 
         {panel === 'operations' ? (

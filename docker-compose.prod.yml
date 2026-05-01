@@ -133,6 +133,7 @@ services:
       UPLOAD_MAX_FILE_SIZE_BYTES: ${UPLOAD_MAX_FILE_SIZE_BYTES:-52428800}
     volumes:
       - ./storage/uploads:/app/storage/uploads
+      - ./scripts:/app/scripts:ro
 
   beta-backend:
     build: ./backend

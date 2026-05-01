@@ -64,6 +64,16 @@ BOOKEDAI_COMMUNICATION_TEMPLATES: dict[str, str] = {
         "Hi ${customer_name}, we received your request for ${service_name}.\n"
         "A team member will confirm details with you shortly."
     ),
+    # Monthly schedule reminder is rendered via
+    # ``render_bookedai_monthly_schedule_reminder_email`` (full HTML+text
+    # output). The body string here is a fallback used by SMS/WhatsApp
+    # callers if they ever reuse the same template_key for a short
+    # broadcast — kept short and bilingual-neutral on purpose.
+    "bookedai_monthly_schedule_reminder": (
+        "${tenant_brand_name} — ${month_label} schedule for ${student_name}.\n"
+        "${sessions_text}\n"
+        "Manage: ${manage_link}"
+    ),
 }
 
 
@@ -365,6 +375,186 @@ def render_bookedai_confirmation_email(
         text="\n".join(text_lines),
         html=html,
     )
+
+
+_MONTHLY_SCHEDULE_REMINDER_COPY: dict[str, dict[str, str]] = {
+    "en": {
+        "subject_template": "${tenant_brand_name} — your ${month_label} schedule",
+        "greeting_template": "Hi ${parent_name},",
+        "intro_template": (
+            "Here is the ${month_label} chess schedule for ${student_name}:"
+        ),
+        "sessions_heading": "Upcoming sessions",
+        "join_label": "Meeting link",
+        "manage_label": "Manage your bookings",
+        "coach_signoff_default": "See you on the board.",
+        "channel_note": (
+            "Reply to this email or message us on WhatsApp/Telegram if you "
+            "need to reschedule any of these sessions."
+        ),
+        "no_sessions_note": (
+            "We could not find any sessions on your calendar for "
+            "${month_label}. If that looks wrong, reply here and we'll "
+            "investigate."
+        ),
+    },
+    "vi": {
+        "subject_template": "${tenant_brand_name} — lịch học tháng ${month_label}",
+        "greeting_template": "Chào ${parent_name},",
+        "intro_template": (
+            "Lịch học cờ vua tháng ${month_label} của ${student_name}:"
+        ),
+        "sessions_heading": "Buổi học sắp tới",
+        "join_label": "Link buổi học",
+        "manage_label": "Quản lý đặt lịch",
+        "coach_signoff_default": "Hẹn gặp con trên bàn cờ.",
+        "channel_note": (
+            "Trả lời email này hoặc nhắn qua WhatsApp/Telegram nếu cần đổi "
+            "lịch buổi học."
+        ),
+        "no_sessions_note": (
+            "Hiện chưa thấy buổi học nào trong tháng ${month_label}. Nếu "
+            "thông tin chưa đúng, vui lòng phản hồi để chúng tôi kiểm tra."
+        ),
+    },
+}
+
+
+def render_bookedai_monthly_schedule_reminder_email(
+    *,
+    variables: dict[str, str] | None,
+    public_app_url: str | None = None,
+) -> RenderedEmailTemplate:
+    """Render the per-parent monthly chess schedule reminder email.
+
+    Variables consumed:
+
+    * ``parent_name`` — recipient first name (or "there" fallback).
+    * ``student_name`` — child the schedule is for.
+    * ``month_label`` — human label, e.g. ``"May 2026"`` (EN) or ``"5/2026"``
+      (VI). The caller is expected to localise the month label upstream so
+      this renderer stays purely formatting-focused.
+    * ``sessions_text`` — already-formatted multi-line list of upcoming
+      sessions (one bullet per line, e.g. ``"• Tue 6 May, 17:30 ICT — Superkid"``).
+    * ``meeting_url_general`` — fallback meeting URL when individual slots
+      do not carry a Zoho join link. May be empty.
+    * ``manage_link`` — portal URL for the parent to review/cancel.
+    * ``tenant_brand_name`` — display name in the subject + footer (e.g.
+      ``"Mai Hưng Chess Academy"``).
+    * ``coach_blurb`` — optional one-liner from the coach (override of the
+      default sign-off).
+    * ``locale`` — ``"en"`` (default) or ``"vi"``.
+
+    The renderer is bilingual EN+VI and never raises; missing optional
+    fields fall through to safe defaults so the email always sends.
+    """
+    locale = _normalize_email_locale((variables or {}).get("locale"))
+    copy = _MONTHLY_SCHEDULE_REMINDER_COPY[locale]
+    parent_name = _safe_value(variables, "parent_name", "there")
+    student_name = _safe_value(variables, "student_name", "your student")
+    month_label = _safe_value(variables, "month_label", "this month")
+    tenant_brand_name = _safe_value(
+        variables, "tenant_brand_name", "Mai Hưng Chess Academy"
+    )
+    sessions_text = str((variables or {}).get("sessions_text") or "").strip()
+    meeting_url_general = str(
+        (variables or {}).get("meeting_url_general") or ""
+    ).strip()
+    manage_link = str((variables or {}).get("manage_link") or "").strip()
+    coach_blurb = str((variables or {}).get("coach_blurb") or "").strip()
+    if not coach_blurb:
+        coach_blurb = copy["coach_signoff_default"]
+
+    template_vars = {
+        "parent_name": parent_name,
+        "student_name": student_name,
+        "month_label": month_label,
+        "tenant_brand_name": tenant_brand_name,
+    }
+    subject = Template(copy["subject_template"]).safe_substitute(template_vars)
+    greeting = Template(copy["greeting_template"]).safe_substitute(template_vars)
+    intro = Template(copy["intro_template"]).safe_substitute(template_vars)
+
+    text_body_lines: list[str] = [greeting, "", intro, ""]
+    if sessions_text:
+        text_body_lines.extend([sessions_text, ""])
+    else:
+        text_body_lines.extend(
+            [
+                Template(copy["no_sessions_note"]).safe_substitute(template_vars),
+                "",
+            ]
+        )
+    if meeting_url_general:
+        text_body_lines.append(f"{copy['join_label']}: {meeting_url_general}")
+    if manage_link:
+        text_body_lines.append(f"{copy['manage_label']}: {manage_link}")
+    text_body_lines.extend(["", copy["channel_note"], "", coach_blurb, "", f"— {tenant_brand_name}"])
+    text = "\n".join(line for line in text_body_lines)
+
+    safe_greeting = _html_value(greeting)
+    safe_intro = _html_value(intro)
+    safe_brand = _html_value(tenant_brand_name)
+    safe_signoff = _html_value(coach_blurb)
+    safe_channel_note = _html_value(copy["channel_note"])
+    safe_sessions_html = (
+        "".join(
+            f"<li style=\"margin:6px 0;font-size:15px;line-height:1.65;color:#1d1d1f;\">{_html_value(line.lstrip('•').strip())}</li>"
+            for line in sessions_text.splitlines()
+            if line.strip()
+        )
+        if sessions_text
+        else (
+            "<li style=\"margin:6px 0;font-size:15px;line-height:1.65;color:#5b6b66;\">"
+            + _html_value(
+                Template(copy["no_sessions_note"]).safe_substitute(template_vars)
+            )
+            + "</li>"
+        )
+    )
+    meeting_block_html = ""
+    if meeting_url_general:
+        safe_meeting = _html_value(meeting_url_general)
+        meeting_block_html = (
+            f"<p style=\"margin:18px 0 0 0;font-size:14px;line-height:1.65;color:#1d1d1f;\">"
+            f"<strong>{_html_value(copy['join_label'])}:</strong> "
+            f"<a href=\"{safe_meeting}\" style=\"color:#0071e3;text-decoration:none;word-break:break-all;\">{safe_meeting}</a>"
+            "</p>"
+        )
+    manage_block_html = ""
+    if manage_link:
+        safe_manage = _html_value(manage_link)
+        manage_block_html = (
+            f"<p style=\"margin:6px 0 0 0;font-size:14px;line-height:1.65;color:#1d1d1f;\">"
+            f"<strong>{_html_value(copy['manage_label'])}:</strong> "
+            f"<a href=\"{safe_manage}\" style=\"color:#0071e3;text-decoration:none;word-break:break-all;\">{safe_manage}</a>"
+            "</p>"
+        )
+
+    html = (
+        f"<!doctype html><html lang=\"{locale}\"><body style=\"margin:0;background:#fdfaf3;"
+        "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;"
+        "color:#1d1d1f;padding:32px 16px;\">"
+        "<div style=\"max-width:560px;margin:0 auto;padding:24px;background:#ffffff;"
+        "border-radius:18px;border:1px solid rgba(15,92,84,0.12);\">"
+        f"<p style=\"margin:0 0 12px 0;font-size:16px;\">{safe_greeting}</p>"
+        f"<p style=\"margin:0 0 16px 0;font-size:15px;line-height:1.65;\">{safe_intro}</p>"
+        "<div style=\"background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;"
+        "padding:14px 18px;\">"
+        f"<div style=\"font-size:12px;font-weight:700;letter-spacing:0.12em;"
+        f"text-transform:uppercase;color:#0f5c54;margin-bottom:6px;\">"
+        f"{_html_value(copy['sessions_heading'])}</div>"
+        f"<ul style=\"margin:0;padding-left:18px;\">{safe_sessions_html}</ul>"
+        "</div>"
+        f"{meeting_block_html}{manage_block_html}"
+        f"<p style=\"margin:18px 0 0 0;font-size:13px;line-height:1.6;color:#475569;\">"
+        f"{safe_channel_note}</p>"
+        f"<p style=\"margin:24px 0 0 0;font-size:14px;color:#1d1d1f;\">{safe_signoff}</p>"
+        f"<p style=\"margin:6px 0 0 0;font-size:13px;color:#5b6b66;\">— {safe_brand}</p>"
+        "</div></body></html>"
+    )
+
+    return RenderedEmailTemplate(subject=subject, text=text, html=html)
 
 
 def normalize_e164(value: str) -> str:

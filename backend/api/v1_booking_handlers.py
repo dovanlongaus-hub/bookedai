@@ -63,6 +63,11 @@ from service_layer.calls_scheduling import (
     create_zoho_meeting_for_booking,
     zoho_calendar_configured,
 )
+from service_layer.zoho_crm_transcript_sync import (
+    TranscriptSyncResult,
+    build_transcript_summary,
+    push_transcript_to_zoho_task_with_overrides,
+)
 from service_layer.zoho_tenant_credentials import (
     resolve_tenant_zoho_calendar_credentials,
     resolve_tenant_zoho_crm_credentials,
@@ -127,6 +132,7 @@ def _public_safe_crm_sync_payload(
     contact_status: str | None = None,
     deal_status: str | None = None,
     task_status: str | None = None,
+    transcript_task_status: str | None = None,
 ) -> dict[str, object]:
     return {
         key: {"sync_status": status}
@@ -135,6 +141,7 @@ def _public_safe_crm_sync_payload(
             "contact": contact_status,
             "deal": deal_status,
             "task": task_status,
+            "transcript_task": transcript_task_status,
         }.items()
         if status
     }
@@ -1749,6 +1756,86 @@ async def create_booking_intent(request: Request, payload: CreateBookingIntentRe
                 external_contact_id=contact_sync_result.external_entity_id,
                 tenant_crm_credentials=tenant_crm_credentials,
             )
+
+            # Conversation-transcript Zoho sync. Snapshot every web /
+            # WhatsApp / Telegram conversation_events row for this
+            # contact in the past 24h and push it as a single Zoho CRM
+            # Task on the synced contact, giving operators a one-click
+            # reference for what the parent asked + what the bot
+            # replied. Best-effort — failures log a warning and never
+            # break the booking flow. Idempotent via
+            # ``booking_intents.metadata_json.transcript_task_synced``.
+            transcript_sync_result: TranscriptSyncResult | None = None
+            try:
+                already_synced = await booking_repository.is_transcript_task_synced(
+                    booking_reference=booking_reference,
+                )
+                if already_synced:
+                    transcript_sync_result = TranscriptSyncResult(
+                        sync_status="skipped",
+                        warning_codes=["already_synced"],
+                    )
+                elif (
+                    contact_sync_result.external_entity_id
+                    and booking_settings is not None
+                ):
+                    transcript_text = await build_transcript_summary(
+                        session,
+                        contact_email=normalized_email,
+                        contact_phone=normalized_phone,
+                        conversation_id=None,
+                    )
+                    if not transcript_text.strip():
+                        transcript_sync_result = TranscriptSyncResult(
+                            sync_status="skipped",
+                            warning_codes=["empty_transcript"],
+                        )
+                    else:
+                        transcript_sync_result = (
+                            await push_transcript_to_zoho_task_with_overrides(
+                                booking_settings,
+                                contact_external_id=str(
+                                    contact_sync_result.external_entity_id
+                                ),
+                                transcript=transcript_text,
+                                booking_reference=booking_reference,
+                                customer_name=payload.contact.full_name,
+                                tenant_credentials=tenant_crm_credentials,
+                            )
+                        )
+                        if transcript_sync_result.sync_status == "synced":
+                            await booking_repository.mark_transcript_task_synced(
+                                booking_reference=booking_reference,
+                                zoho_task_id=transcript_sync_result.record_id,
+                                line_count=transcript_sync_result.line_count,
+                            )
+                else:
+                    transcript_sync_result = TranscriptSyncResult(
+                        sync_status="skipped",
+                        warning_codes=["contact_not_synced"],
+                    )
+            except Exception as exc:  # noqa: BLE001
+                _logger.warning(
+                    "zoho_transcript_sync_failed",
+                    extra={
+                        "event_type": "zoho_transcript_sync_failed",
+                        "tenant_id": str(effective_tenant_id or ""),
+                        "status": 0,
+                        "route": "/api/v1/booking/intent",
+                        "request_id": "",
+                        "integration_name": "zoho_crm",
+                        "conversation_id": "",
+                        "booking_reference": booking_reference,
+                        "job_name": "",
+                        "job_id": "",
+                    },
+                    exc_info=exc,
+                )
+                transcript_sync_result = TranscriptSyncResult(
+                    sync_status="manual_review_required",
+                    warning_codes=["unhandled_exception"],
+                )
+
             await _record_phase2_write_activity(
                 session,
                 tenant_id=effective_tenant_id,
@@ -1769,6 +1856,11 @@ async def create_booking_intent(request: Request, payload: CreateBookingIntentRe
                         "contact": contact_sync_result.sync_status,
                         "deal": booking_crm_sync.deal_sync_status,
                         "task": booking_crm_sync.task_sync_status,
+                        "transcript_task": (
+                            transcript_sync_result.sync_status
+                            if transcript_sync_result is not None
+                            else "skipped"
+                        ),
                     },
                 },
                 outbox_event_type="booking_intent.capture.recorded",
@@ -1784,6 +1876,11 @@ async def create_booking_intent(request: Request, payload: CreateBookingIntentRe
                         "contact_record_id": contact_sync_result.record_id,
                         "deal_record_id": booking_crm_sync.deal_record_id,
                         "task_record_id": booking_crm_sync.task_record_id,
+                        "transcript_task_record_id": (
+                            transcript_sync_result.record_id
+                            if transcript_sync_result is not None
+                            else None
+                        ),
                     },
                 },
                 idempotency_key=f"booking-intent:{booking_intent_id}" if booking_intent_id else None,
@@ -1965,6 +2062,11 @@ async def create_booking_intent(request: Request, payload: CreateBookingIntentRe
             contact_status=contact_sync_result.sync_status,
             deal_status=booking_crm_sync.deal_sync_status,
             task_status=booking_crm_sync.task_sync_status,
+            transcript_task_status=(
+                transcript_sync_result.sync_status
+                if transcript_sync_result is not None
+                else None
+            ),
         )
         internal_crm_sync = {
             "lead": {
@@ -1988,6 +2090,28 @@ async def create_booking_intent(request: Request, payload: CreateBookingIntentRe
                 "record_id": booking_crm_sync.task_record_id,
                 "sync_status": booking_crm_sync.task_sync_status,
                 "external_entity_id": booking_crm_sync.task_external_entity_id,
+            },
+            "transcript_task": {
+                "sync_status": (
+                    transcript_sync_result.sync_status
+                    if transcript_sync_result is not None
+                    else "skipped"
+                ),
+                "external_entity_id": (
+                    transcript_sync_result.record_id
+                    if transcript_sync_result is not None
+                    else None
+                ),
+                "line_count": (
+                    transcript_sync_result.line_count
+                    if transcript_sync_result is not None
+                    else 0
+                ),
+                "warning_codes": (
+                    list(transcript_sync_result.warning_codes or [])
+                    if transcript_sync_result is not None
+                    else []
+                ),
             },
             "warning_codes": booking_crm_sync.warning_codes,
         }
