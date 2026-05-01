@@ -12,6 +12,16 @@ It is also the mandatory write-back target whenever a change has been completed 
 
 Date: `2026-04-28`
 
+Implementation update from `2026-05-01` (requirement docs sync and live deploy closeout):
+
+- fast-forwarded `main` to include PR `#35`, synchronized active requirement/PM/UAT/RACI/milestone/phase docs with the corrected default closeout posture, and pushed commits `c5df637` plus `60f7ba8`
+- confirmed GitHub had no open PRs before deploy and `main` matched `origin/main`
+- ran live deploy through `bash scripts/deploy_live_host.sh`; production images rebuilt/recreated and deploy completed for public, product, demo, chess, AI Mentor, portal, tenant, pitch, admin, API, n8n, Supabase, Hermes, uploads, calendar redirect, and OpenClaw Control UI hosts
+- post-deploy stack health passed at `2026-05-01T14:15:58Z`
+- smoke probes returned HTTP `200` for `https://api.bookedai.au/api/health`, `https://bookedai.au`, `https://product.bookedai.au`, `https://tenant.bookedai.au`, `https://admin.bookedai.au`, `https://portal.bookedai.au`, and `https://aimentor.bookedai.au`
+- published the live-deploy closeout to Notion with Discord skipped; archive entry: `docs/development/telegram-sync/2026-05-01/141628-requirement-sync-and-live-deploy-closeout-2026-05-01.md`
+- Discord was not used
+
 Implementation update from `2026-05-01` (requirement docs Discord-default sync, documentation-only):
 
 - fast-forwarded `main` after PR `#35` added Future Swim sub-project cross-references into the PM master PRD and execution plan
